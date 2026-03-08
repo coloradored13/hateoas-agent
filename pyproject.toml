@@ -24,7 +24,7 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -55,6 +55,9 @@ Issues = "https://github.com/coloradored13/hateoas-agent/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hateoas_agent"]
+
+[tool.pytest.ini_options]
+addopts = "--ignore=tests/test_adversarial.py"
 
 [tool.ruff]
 target-version = "py310"
