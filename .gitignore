@@ -33,3 +33,8 @@ htmlcov/
 .DS_Store
 Thumbs.db
 .claude/
+
+# Environment
+.env
+.env.*
+!.env.example
