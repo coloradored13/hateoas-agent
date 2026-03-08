@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hateoas-agent"
+version = "0.1.0"
+description = "Dynamic tool discovery for AI agents using HATEOAS-style action advertisement"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "BJ Gilbert" },
+]
+keywords = [
+    "ai",
+    "agent",
+    "hateoas",
+    "tool-discovery",
+    "claude",
+    "llm",
+    "state-machine",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+anthropic = [
+    "anthropic>=0.40",
+]
+mcp = [
+    "mcp>=1.0",
+]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/bjgilbert/hateoas-agent"
+Repository = "https://github.com/bjgilbert/hateoas-agent"
+Issues = "https://github.com/bjgilbert/hateoas-agent/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hateoas_agent"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
