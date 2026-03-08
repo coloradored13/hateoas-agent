@@ -232,3 +232,81 @@ class TestCrossAPIParity:
         res_reg.handle_tool_call("resolve_ticket", {"ticket_id": "T1"})
 
         assert sm_reg._last_state == res_reg._last_state == "resolved"
+
+    def test_required_fields_preserved_in_resource_actions(self):
+        """Resource.get_actions_for_state must preserve required fields on ActionDef."""
+
+        class OrderResource(Resource):
+            name = "orders"
+
+            @gateway(name="find_order", description="Find order", params={"order_id": "string"})
+            def find(self, order_id=None, **kw):
+                return {"order_id": order_id, "_state": "pending"}
+
+            @action(
+                name="ship_order",
+                description="Ship",
+                params={"order_id": "string", "carrier": "string", "note": "string"},
+                required=["order_id", "carrier"],
+            )
+            @state("pending")
+            def ship(self, order_id, carrier, note=""):
+                return {"shipped": True, "_state": "shipped"}
+
+        res = OrderResource()
+        actions = res.get_actions_for_state("pending")
+        ship_action = next(a for a in actions if a.name == "ship_order")
+        assert ship_action.required == ["order_id", "carrier"]
+
+    def test_required_fields_match_across_apis(self):
+        """StateMachine and Resource must return identical required lists."""
+        # StateMachine with required
+        sm = StateMachine("orders", gateway_name="find_order")
+        sm.gateway(description="Find order", params={"order_id": "string"})
+        sm.state(
+            "pending",
+            actions=[
+                {
+                    "name": "ship_order",
+                    "description": "Ship",
+                    "params": {"order_id": "string", "carrier": "string"},
+                    "required": ["order_id", "carrier"],
+                },
+            ],
+        )
+
+        @sm.on_gateway
+        def find(order_id=None, **kw):
+            return {"order_id": order_id, "_state": "pending"}
+
+        @sm.on_action("ship_order")
+        def ship(order_id, carrier):
+            return {"shipped": True, "_state": "shipped"}
+
+        # Resource with required
+        class OrderResource(Resource):
+            name = "orders"
+
+            @gateway(name="find_order", description="Find order", params={"order_id": "string"})
+            def find(self, order_id=None, **kw):
+                return {"order_id": order_id, "_state": "pending"}
+
+            @action(
+                name="ship_order",
+                description="Ship",
+                params={"order_id": "string", "carrier": "string"},
+                required=["order_id", "carrier"],
+            )
+            @state("pending")
+            def ship(self, order_id, carrier):
+                return {"shipped": True, "_state": "shipped"}
+
+        res = OrderResource()
+
+        sm_actions = sm.get_actions_for_state("pending")
+        res_actions = res.get_actions_for_state("pending")
+
+        sm_ship = next(a for a in sm_actions if a.name == "ship_order")
+        res_ship = next(a for a in res_actions if a.name == "ship_order")
+
+        assert sm_ship.required == res_ship.required == ["order_id", "carrier"]

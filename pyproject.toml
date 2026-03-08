@@ -49,9 +49,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/bjgilbert/hateoas-agent"
-Repository = "https://github.com/bjgilbert/hateoas-agent"
-Issues = "https://github.com/bjgilbert/hateoas-agent/issues"
+Homepage = "https://github.com/coloradored13/hateoas-agent"
+Repository = "https://github.com/coloradored13/hateoas-agent"
+Issues = "https://github.com/coloradored13/hateoas-agent/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hateoas_agent"]

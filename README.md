@@ -21,9 +21,9 @@ hateoas-agent applies the same principle that makes the web work — [HATEOAS](h
 ## Install
 
 ```bash
-pip install hateoas-agent                  # core library (no LLM dependency)
-pip install 'hateoas-agent[anthropic]'     # with Claude Runner support
-pip install 'hateoas-agent[mcp]'           # with MCP server support
+pip install git+https://github.com/coloradored13/hateoas-agent.git                  # core library (no LLM dependency)
+pip install 'hateoas-agent[anthropic]'     # with Claude Runner support (after installing core)
+pip install 'hateoas-agent[mcp]'           # with MCP server support (after installing core)
 ```
 
 ## Quick start

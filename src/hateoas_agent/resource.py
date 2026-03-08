@@ -167,6 +167,7 @@ class Resource:
                     name=action_def.name,
                     description=action_def.description,
                     params=action_def.params,
+                    required=action_def.required,
                     handler=method,
                 )
                 actions.append(ad)
