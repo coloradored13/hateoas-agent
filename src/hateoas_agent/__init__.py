@@ -4,7 +4,7 @@ Instead of pre-registering hundreds of tools, start with one gateway tool.
 Each response advertises what actions are available next based on current state.
 """
 
-__version__ = "0.2.0-dev"
+__version__ = "0.2.0"
 
 from .advertisement import format_error_with_actions, format_result_with_actions
 from .agent_slot import AgentResult, AgentSlot, AgentStatus
