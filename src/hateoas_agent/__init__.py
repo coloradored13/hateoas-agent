@@ -4,10 +4,22 @@ Instead of pre-registering hundreds of tools, start with one gateway tool.
 Each response advertises what actions are available next based on current state.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0-dev"
 
 from .advertisement import format_error_with_actions, format_result_with_actions
+from .agent_slot import AgentResult, AgentSlot, AgentStatus
+from .async_runner import AsyncRunner
 from .composite import CompositeRegistry, ToolNameConflictError
+from .conditions import (
+    Condition,
+    all_converged,
+    belief_above,
+    context_equals,
+    context_true,
+    exit_gate_passed,
+    gap_count_below,
+    round_limit,
+)
 from .errors import (
     HateoasError,
     InvalidActionError,
@@ -16,6 +28,13 @@ from .errors import (
     PhantomToolError,
     StateNotFoundError,
 )
+from .orchestrator import Orchestrator, OrchestratorState, PhaseDef, PhaseResult, TransitionDef
+from .orchestrator_persistence import (
+    OrchestratorCheckpoint,
+    load_orchestrator_checkpoint,
+    save_orchestrator_checkpoint,
+)
+from .orchestrator_visualization import orchestrator_to_mermaid
 from .persistence import (
     RegistryCheckpoint,
     RunnerCheckpoint,
@@ -47,6 +66,31 @@ __all__ = [
     # Multi-resource
     "CompositeRegistry",
     "ToolNameConflictError",
+    # Orchestration (v0.2)
+    "Orchestrator",
+    "AsyncRunner",
+    "OrchestratorState",
+    "PhaseDef",
+    "PhaseResult",
+    "TransitionDef",
+    "AgentSlot",
+    "AgentStatus",
+    "AgentResult",
+    # Conditions (v0.2)
+    "Condition",
+    "all_converged",
+    "belief_above",
+    "exit_gate_passed",
+    "gap_count_below",
+    "round_limit",
+    "context_equals",
+    "context_true",
+    # Orchestrator Persistence (v0.2)
+    "OrchestratorCheckpoint",
+    "save_orchestrator_checkpoint",
+    "load_orchestrator_checkpoint",
+    # Orchestrator Visualization (v0.2)
+    "orchestrator_to_mermaid",
     # Types
     "ActionDef",
     "ActionResult",
