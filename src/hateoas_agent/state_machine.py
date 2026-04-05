@@ -152,6 +152,12 @@ class StateMachine:
                     f"from_states cannot be an empty list for action '{name}'. "
                     f"Use from_states='*' for universal actions."
                 )
+            bad = [s for s in from_states if not isinstance(s, str)]
+            if bad:
+                raise ValueError(
+                    f"from_states entries must be strings for action '{name}', "
+                    f"got {[type(s).__name__ for s in bad]}"
+                )
             resolved = from_states
         else:
             raise ValueError(

@@ -195,7 +195,7 @@ def handle_approve(order_id):
 **Key rules:**
 - Every handler should return a dict with `_state` set to the current state name
 - `_state` is stripped before results reach the LLM — it's internal plumbing, not user-visible data
-- If you omit `_state`, the state stays unchanged and a warning is logged
+- If a handler returns a dict without `_state`, the state stays unchanged and a warning is logged
 - `_state` must be a string — non-string values raise `TypeError`
 
 If you're using the action-centric API with `to_state` metadata, the framework will also warn if your handler returns a `_state` that doesn't match the declared `to_state` — useful for catching bugs early.
@@ -209,7 +209,7 @@ The framework uses server-side state validation — not prompts — to enforce c
 - **Server-side state validation** — actions called in the wrong state or before any gateway call are rejected.
 - **Phantom tool detection** — if the agent fabricates a tool name, it's caught and rejected.
 - **Defensive system prompt** — instructs the LLM to only use actions from the most recent tool result.
-- **Parameter filtering** — handlers only receive declared parameters. Extra keys are stripped.
+- **Parameter filtering** — handlers only receive declared parameters. Extra keys are stripped. Required parameters are validated before handler execution; missing required params return an error without calling the handler.
 - **State type validation** — `_state` must be a string. Non-string values raise `TypeError`.
 
 **Callbacks and strict mode:**

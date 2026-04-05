@@ -122,7 +122,9 @@ def serve(
         if state_changed:
             await server.request_context.session.send_tool_list_changed()
 
-        return [TextContent(type="text", text=result_text)]
+        return CallToolResult(
+            content=[TextContent(type="text", text=result_text)],
+        )
 
     async def _run():
         async with stdio_server() as (read_stream, write_stream):

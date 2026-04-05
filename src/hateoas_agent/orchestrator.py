@@ -568,7 +568,14 @@ class Orchestrator:
         actions: List[ActionDef],
         context: Optional[Dict[str, Any]] = None,
     ) -> List[ActionDef]:
-        """Filter transition actions by evaluating their guards."""
+        """Filter transition actions by evaluating their guards.
+
+        Args:
+            actions: Actions to filter.
+            context: Context dict to evaluate guards against. Falls back
+                to ``self._context`` when not provided.
+        """
+        eval_ctx = context if context is not None else self._context
         result: List[ActionDef] = []
         for action_def in actions:
             if action_def.name == "advance":
@@ -583,7 +590,7 @@ class Orchestrator:
                 result.append(action_def)
                 continue
             try:
-                if trans.guard(self._context):
+                if trans.guard(eval_ctx):
                     result.append(action_def)
             except Exception:
                 logger.debug(
@@ -721,12 +728,14 @@ class Orchestrator:
 
             # advance() evaluates guards against self._context — do NOT
             # merge tool context before this call.
-            state = self.advance()
+            self.advance()
 
             # Merge tool context after guard evaluation
             if ctx_update:
                 self._context.update(ctx_update)
 
+            # Snapshot after merge so returned context includes tool updates
+            state = self._make_state()
             return {
                 "phase": state.current_phase,
                 "context": state.context,

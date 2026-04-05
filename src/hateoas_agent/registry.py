@@ -72,6 +72,14 @@ def _filter_params(tool_input: Dict[str, Any], declared_params: Dict[str, str]) 
     return {k: v for k, v in tool_input.items() if k in declared_params}
 
 
+def _check_required(filtered: Dict[str, Any], required: List[str], action_name: str) -> Optional[str]:
+    """Check that all required parameters are present. Returns error message or None."""
+    missing = [r for r in required if r not in filtered]
+    if missing:
+        return f"Missing required parameter(s) for '{action_name}': {', '.join(missing)}"
+    return None
+
+
 _VALID_JSON_SCHEMA_TYPES = {"string", "number", "integer", "boolean", "array", "object", "null"}
 
 
@@ -195,6 +203,9 @@ class Registry:
             raise NoGatewayError()
 
         filtered = _filter_params(tool_input, gw.params)
+        required_err = _check_required(filtered, gw.required, gw.name)
+        if required_err:
+            return format_result_with_actions({"error": required_err}, [])
         raw_result = gw.handler(**filtered)
         result, state = _extract_state(raw_result)
 
@@ -241,7 +252,13 @@ class Registry:
         # Find the ActionDef to get declared params for filtering
         action_def = next((a for a in available if a.name == tool_name), None)
         declared_params = action_def.params if action_def else {}
+        required_params = action_def.required if action_def else []
         filtered = _filter_params(tool_input, declared_params)
+
+        required_err = _check_required(filtered, required_params, tool_name)
+        if required_err:
+            actions = self._get_filtered_actions(self._last_state)
+            return format_result_with_actions({"error": required_err}, actions)
 
         state_before = self._last_state
         raw_result = handler(**filtered)
