@@ -18,6 +18,16 @@ hateoas-agent applies the same principle that makes the web work — [HATEOAS](h
 | Tools visible per turn | All (100+) | ~10-20 | ~5-10 | **3-5 (only what's valid)** |
 | Model dependency | Any | Any | Provider-specific | **Any** |
 
+## Core concepts
+
+**Gateway** — The single entry-point tool that an LLM calls first. It looks up a resource and returns its current state. Every interaction starts here. Think of it like a REST API's GET endpoint — you query something, and the response tells you what you can do next.
+
+**Actions** — Operations available to the LLM, but only in certain states. An order in "pending" state might offer `approve` and `cancel`. Once approved, those disappear and `ship` appears. The LLM never sees actions that aren't valid right now.
+
+**State** — Handlers return a `_state` key that tells the framework where things stand. The framework uses this to decide which actions to advertise on the next turn. `_state` is stripped before results reach the LLM — it's internal plumbing.
+
+**Registry** — Routes incoming tool calls to the right handler, validates state before execution, filters parameters, and formats the response with the next set of available actions.
+
 ## Install
 
 ```bash
@@ -39,11 +49,15 @@ db = {
 
 orders = StateMachine("orders", gateway_name="query_orders")
 
+# The gateway is the LLM's entry point — it queries a resource and
+# returns its current state, which determines what actions appear next.
 orders.gateway(
     description="Search and retrieve orders",
     params={"order_id": "string"},
 )
 
+# Actions are only visible to the LLM when the resource is in a matching state.
+# approve_order only appears when the order is "pending".
 orders.action("approve_order",
     description="Approve this order",
     from_states=["pending"],
@@ -71,6 +85,8 @@ orders.action("add_note",
     params={"order_id": "string", "note": "string"},
 )
 
+# Handlers return _state to tell the framework what state we're in now.
+# This controls which actions the LLM sees on its next turn.
 @orders.on_gateway
 def handle_query(order_id=None):
     order = db[order_id]
@@ -241,7 +257,9 @@ The MCP server (`hateoas_agent.mcp_server.serve()`) uses stdio transport and tru
 
 ## Orchestration (v0.2)
 
-For multi-agent workflows, the `Orchestrator` models workflow phases as HATEOAS states. Phases are states, transitions between them are guarded by conditions, and agents are managed as `AgentSlot` dataclasses within the orchestrator.
+The core `StateMachine` manages tool discovery for a single LLM conversation. The `Orchestrator` extends the same pattern to multi-agent workflows — where multiple LLM agents need to coordinate through a series of phases (research, challenge, synthesis, etc.) with rules governing when to move between them.
+
+The orchestrator models workflow phases as HATEOAS states. Each phase defines which agents participate and whether they run in parallel. Transitions between phases are guarded by conditions — callable checks against a shared context dict. Agents are managed as `AgentSlot` dataclasses: lightweight containers holding name, role, status, and output.
 
 ```python
 from hateoas_agent import Orchestrator, AgentSlot, AsyncRunner, all_converged, exit_gate_passed
@@ -295,6 +313,38 @@ guard = round_limit(5) | exit_gate_passed()
 - `save_orchestrator_checkpoint()` / `load_orchestrator_checkpoint()` — persist and restore orchestrator state
 - `AgentSlot.join_phase` — agents can join the workflow at a specific phase rather than from the start
 - `run_agent()` and `run_agents_parallel()` — sequential and parallel agent execution with pluggable executors
+
+## MCP server integration
+
+[MCP (Model Context Protocol)](https://modelcontextprotocol.io) is an open standard for connecting LLMs to external tools. Instead of embedding tool logic inside your LLM application, you run a separate MCP server that exposes tools over a transport layer (typically stdio). The LLM client discovers available tools at runtime and calls them through the protocol.
+
+hateoas-agent can expose any state machine as an MCP server with one call:
+
+```python
+from hateoas_agent.mcp_server import serve
+
+serve(my_state_machine, name="my-server")
+```
+
+This starts a stdio-based MCP server where:
+- The gateway and current-state actions are listed as MCP tools
+- After each tool call that changes state, the server sends a `tools/list_changed` notification so the client refreshes its tool list
+- State validation, parameter filtering, and all other security layers apply identically to MCP calls
+
+To connect from Claude Code, add the server to `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "python",
+      "args": ["my_mcp_server.py"]
+    }
+  }
+}
+```
+
+See `examples/orders_mcp.py` for a complete working example.
 
 ## Additional features
 
