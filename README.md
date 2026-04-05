@@ -235,6 +235,72 @@ runner = Runner(
 - You need **server-side guarantees** that the agent can't take invalid actions
 - You want to **prototype fast** (discovery mode) and **lock down later** (strict mode)
 
+## Orchestration (v0.2)
+
+For multi-agent workflows, the `Orchestrator` models workflow phases as HATEOAS states. Phases are states, transitions between them are guarded by conditions, and agents are managed as `AgentSlot` dataclasses within the orchestrator.
+
+```python
+from hateoas_agent import Orchestrator, AgentSlot, AsyncRunner, all_converged, exit_gate_passed
+
+review = Orchestrator(
+    name="code-review",
+    agents=[
+        AgentSlot("reviewer", role="Code review"),
+        AgentSlot("security", role="Security audit"),
+        AgentSlot("challenger", role="Adversarial review", join_phase="challenge"),
+    ],
+)
+
+review.phase("research", parallel=True, agents="*")
+review.phase("challenge", parallel=True, agents="*")
+review.phase("synthesis", parallel=False, agents=["reviewer"], terminal=True)
+
+review.transition("research", "challenge",
+    guard=all_converged())
+review.transition("challenge", "synthesis",
+    guard=exit_gate_passed())
+review.transition("challenge", "challenge")  # self-loop for additional rounds
+
+@review.on_phase("research")
+def run_research(orchestrator, agents, context):
+    for agent in agents:
+        orchestrator.run_agent(agent, task=context["task"])
+    return {"round": 1}
+
+state = review.start("research", context={"task": "review auth module"})
+state = review.advance(context={"converged": True})
+```
+
+Because `Orchestrator` implements the same `HasHateoas` protocol as `StateMachine`, it works with `Registry` (tool routing), MCP server, persistence, and visualization with no additional integration code.
+
+For a real-world example, [sigma-mem](https://github.com/coloradored13/sigma-mem) uses hateoas-agent's state machine and MCP integration to build a persistent memory system for AI agent teams.
+
+**Guard conditions** — composable factories in `conditions.py`:
+
+```python
+from hateoas_agent import all_converged, belief_above, round_limit
+
+# Compose with & | ~
+guard = all_converged() & belief_above("confidence", 0.85)
+guard = round_limit(5) | exit_gate_passed()
+```
+
+**Additional features:**
+- `AsyncRunner` — drives an orchestrator to completion with async handler support
+- `orchestrator_to_mermaid()` — generates Mermaid diagrams with guard labels and agent annotations
+- `save_orchestrator_checkpoint()` / `load_orchestrator_checkpoint()` — persist and restore orchestrator state
+- `AgentSlot.join_phase` — agents can join the workflow at a specific phase rather than from the start
+- `run_agent()` and `run_agents_parallel()` — sequential and parallel agent execution with pluggable executors
+
+## Additional features
+
+Beyond the core state machine and orchestrator:
+
+- **Visualization** — `state_machine_to_mermaid()` and `discovery_report_to_mermaid()` generate Mermaid diagrams from any state machine or discovery session
+- **Persistence** — `save_runner_checkpoint()` / `load_runner_checkpoint()` serialize full runner state (conversation history, current state, tool definitions) to JSON for pause/resume
+- **Composite registries** — `CompositeRegistry` merges multiple state machines into a single tool namespace with conflict detection
+- **Validation** — `validate_action()` checks action definitions for common mistakes before runtime
+
 ## Examples
 
 See `examples/` for complete working examples:
@@ -251,3 +317,7 @@ See `examples/` for complete working examples:
 - `comparison_flat_vs_hateoas.py` — flat tools vs HATEOAS side-by-side
 - `database_admin.py` — SQLite admin tool with state-driven navigation
 - `database_admin_api.py` — database admin with action-centric API
+
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE) for details.

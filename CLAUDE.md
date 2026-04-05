@@ -4,7 +4,7 @@ Dynamic tool discovery for AI agents using HATEOAS-style action advertisement.
 
 ## Quick reference
 
-- **Source**: `src/hateoas_agent/` (13 modules)
+- **Source**: `src/hateoas_agent/` (18 modules)
 - **Tests**: `tests/` — run with `python3 -m pytest tests/ -q`
 - **Lint**: `python3 -m ruff check src/ tests/`
 - **Python**: >=3.10
@@ -12,7 +12,7 @@ Dynamic tool discovery for AI agents using HATEOAS-style action advertisement.
 
 ## Architecture
 
-Two API surfaces that both implement the `HasHateoas` protocol:
+Three API surfaces that all implement the `HasHateoas` protocol:
 
 | API | Entry point | Use case |
 |-----|------------|----------|
