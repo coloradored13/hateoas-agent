@@ -505,8 +505,8 @@ class TestParamFiltering:
         reg.handle_tool_call("do_thing", {"id": "1", "injected": "value"})
         assert received == {"id": "1"}
 
-    def test_empty_params_passes_all(self):
-        """When no params are declared, all input passes through."""
+    def test_empty_params_strips_all(self):
+        """When no params are declared, no input reaches the handler."""
         received = {}
         sm = StateMachine("test", gateway_name="gw")
         sm.gateway(description="GW", params={})
@@ -518,7 +518,7 @@ class TestParamFiltering:
 
         reg = Registry(sm)
         reg.handle_tool_call("gw", {"foo": "bar"})
-        assert received == {"foo": "bar"}
+        assert received == {}
 
 
 class TestActionDefCopies:

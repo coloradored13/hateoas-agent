@@ -655,21 +655,25 @@ class TestRegistryIntegration:
         assert "advance" in names
 
     def test_self_loop_via_registry(self, guarded_orchestrator):
-        """Registry handles same-state transitions correctly."""
+        """Registry handles same-state transitions correctly.
+
+        Guard-controlling context must be set programmatically (server-side),
+        not via tool input, because tool-provided context is not merged
+        before guard evaluation.
+        """
         reg = Registry(guarded_orchestrator)
         reg.handle_tool_call(
             "start_workflow",
             {"context": json.dumps({"converged": True})},
         )
-        # Now in challenge via guard. Advance with FAIL -> self-loop
-        reg.handle_tool_call("advance", {"context": json.dumps({"exit_gate": "FAIL"})})
+        # Now in challenge via guard. Set exit_gate programmatically, then advance
+        guarded_orchestrator._context["exit_gate"] = "FAIL"
+        reg.handle_tool_call("advance", {})
         assert reg._last_state == "challenge"
 
         # Now advance with PASS -> synthesis
-        result = reg.handle_tool_call(
-            "advance",
-            {"context": json.dumps({"exit_gate": "PASS"})},
-        )
+        guarded_orchestrator._context["exit_gate"] = "PASS"
+        result = reg.handle_tool_call("advance", {})
         assert "synthesis" in result
         assert reg._last_state == "synthesis"
 

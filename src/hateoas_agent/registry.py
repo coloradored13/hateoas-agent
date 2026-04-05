@@ -61,9 +61,14 @@ def _extract_state(result: Any) -> Tuple[Any, Any]:
 
 
 def _filter_params(tool_input: Dict[str, Any], declared_params: Dict[str, str]) -> Dict[str, Any]:
-    """Filter tool input to only include declared parameter keys."""
+    """Filter tool input to only include declared parameter keys.
+
+    When no parameters are declared, returns an empty dict — the action
+    accepts no input. This prevents LLM-supplied parameters from leaking
+    through to handlers.
+    """
     if not declared_params:
-        return tool_input
+        return {}
     return {k: v for k, v in tool_input.items() if k in declared_params}
 
 

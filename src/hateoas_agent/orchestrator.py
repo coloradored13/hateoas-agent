@@ -478,11 +478,7 @@ class Orchestrator:
 
         def handler(**kwargs: Any) -> Dict[str, Any]:
             phase = kwargs.get("phase") or self._first_phase
-            ctx = kwargs.get("context", {})
-            if isinstance(ctx, str):
-                import json
-
-                ctx = json.loads(ctx)
+            ctx = self._parse_tool_context(kwargs.get("context"))
             state = self.start(phase, context=ctx)
             return {
                 "phase": state.current_phase,
@@ -651,26 +647,51 @@ class Orchestrator:
             is_terminal=self._current_phase in self._terminal_phases,
         )
 
+    @staticmethod
+    def _parse_tool_context(raw: Any) -> Dict[str, Any]:
+        """Parse and validate a context parameter from a tool call.
+
+        Returns an empty dict for invalid input rather than raising.
+        """
+        if not raw:
+            return {}
+        if isinstance(raw, str):
+            import json
+
+            try:
+                raw = json.loads(raw)
+            except json.JSONDecodeError:
+                return {}
+        if isinstance(raw, dict):
+            return raw
+        return {}
+
     def _make_transition_handler(
         self, trans: TransitionDef
     ) -> Callable[..., Dict[str, Any]]:
-        """Create a handler callable for a specific transition."""
+        """Create a handler callable for a specific transition.
+
+        Tool-provided context is stored under ``_tool_context`` and is NOT
+        merged into the orchestrator's context before guard evaluation. This
+        prevents an LLM from injecting values that control guard conditions.
+        After the guard passes, the tool context is merged so that phase
+        handlers can read it.
+        """
 
         def handler(**kwargs: Any) -> Dict[str, Any]:
-            ctx_update = kwargs.get("context")
-            if ctx_update:
-                if isinstance(ctx_update, str):
-                    import json
+            ctx_update = self._parse_tool_context(kwargs.get("context"))
 
-                    ctx_update = json.loads(ctx_update)
-                self._context.update(ctx_update)
-
+            # Evaluate guard BEFORE merging tool-provided context
             if trans.guard is not None and not self._eval_guard(trans.guard):
                 return {
                     "error": f"Guard for transition '{trans.name}' did not pass",
                     "phase": self._current_phase,
                     "_state": self._current_phase,
                 }
+
+            # Guard passed — now merge tool context for phase handler use
+            if ctx_update:
+                self._context.update(ctx_update)
 
             self._current_phase = trans.to_phase
             self._phase_history.append(trans.to_phase)
@@ -689,18 +710,23 @@ class Orchestrator:
         return handler
 
     def _make_advance_handler(self) -> Callable[..., Dict[str, Any]]:
-        """Create a handler callable for the generic advance action."""
+        """Create a handler callable for the generic advance action.
+
+        Tool-provided context is NOT merged before guard evaluation.
+        See ``_make_transition_handler`` for rationale.
+        """
 
         def handler(**kwargs: Any) -> Dict[str, Any]:
-            ctx_update = kwargs.get("context")
-            if ctx_update:
-                if isinstance(ctx_update, str):
-                    import json
+            ctx_update = self._parse_tool_context(kwargs.get("context"))
 
-                    ctx_update = json.loads(ctx_update)
+            # advance() evaluates guards against self._context — do NOT
+            # merge tool context before this call.
+            state = self.advance()
+
+            # Merge tool context after guard evaluation
+            if ctx_update:
                 self._context.update(ctx_update)
 
-            state = self.advance()
             return {
                 "phase": state.current_phase,
                 "context": state.context,

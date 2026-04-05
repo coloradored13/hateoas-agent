@@ -39,6 +39,12 @@ class StateMachine:
     ):
         if mode not in ("strict", "discover"):
             raise ValueError(f"mode must be 'strict' or 'discover', got {mode!r}")
+        if mode == "discover":
+            logger.warning(
+                "StateMachine '%s' is in discover mode — ALL actions are available "
+                "in ALL states. Do not use in production.",
+                name,
+            )
         self.name = name
         self._gateway_name = gateway_name
         self._mode = mode

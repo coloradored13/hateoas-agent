@@ -228,6 +228,10 @@ runner = Runner(
 - `on_invalid_action` — agent called a real action that isn't valid for the current state.
 - `on_transition` — fires on every state change for logging/auditing.
 
+**MCP server security model:**
+
+The MCP server (`hateoas_agent.mcp_server.serve()`) uses stdio transport and trusts all connected clients. State validation and parameter filtering apply to MCP tool calls the same way they do to Runner calls, but there is no authentication or authorization layer. Do not expose the MCP server to untrusted clients.
+
 ## When to use it
 
 - You have a domain with **stateful workflows** (orders, tickets, deployments, approvals)
