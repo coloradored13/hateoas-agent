@@ -72,7 +72,9 @@ def _filter_params(tool_input: Dict[str, Any], declared_params: Dict[str, str]) 
     return {k: v for k, v in tool_input.items() if k in declared_params}
 
 
-def _check_required(filtered: Dict[str, Any], required: List[str], action_name: str) -> Optional[str]:
+def _check_required(
+    filtered: Dict[str, Any], required: List[str], action_name: str
+) -> Optional[str]:
     """Check that all required parameters are present. Returns error message or None."""
     missing = [r for r in required if r not in filtered]
     if missing:
@@ -300,8 +302,7 @@ class Registry:
                     and state_after != declared_to
                 ):
                     logger.warning(
-                        "Action '%s' declared to_state='%s' but handler "
-                        "returned _state='%s'",
+                        "Action '%s' declared to_state='%s' but handler returned _state='%s'",
                         tool_name,
                         declared_to,
                         state_after,

@@ -8,6 +8,7 @@ from hateoas_agent.registry import Registry
 # Check if mcp package is available
 try:
     import mcp  # noqa: F401
+
     HAS_MCP = True
 except ImportError:
     HAS_MCP = False
@@ -16,10 +17,20 @@ except ImportError:
 def _make_sm():
     sm = StateMachine("test", gateway_name="gw")
     sm.gateway(description="GW", params={"id": "string"})
-    sm.action("approve", description="Approve", from_states=["pending"],
-              to_state="approved", params={"id": "string"})
-    sm.action("ship", description="Ship", from_states=["approved"],
-              to_state="shipped", params={"id": "string"})
+    sm.action(
+        "approve",
+        description="Approve",
+        from_states=["pending"],
+        to_state="approved",
+        params={"id": "string"},
+    )
+    sm.action(
+        "ship",
+        description="Ship",
+        from_states=["approved"],
+        to_state="shipped",
+        params={"id": "string"},
+    )
 
     @sm.on_gateway
     def gw(id=""):
@@ -119,6 +130,7 @@ class TestMCPHandlerLogic:
 
         # Try to call 'ship' from 'pending' state — should raise
         from hateoas_agent.errors import InvalidActionError
+
         with pytest.raises(InvalidActionError):
             _handle_call_tool(reg, "ship", {"id": "1"})
 
@@ -132,6 +144,7 @@ class TestMCPHandlerLogic:
         _handle_call_tool(reg, "gw", {"id": "1"})
 
         from hateoas_agent.errors import InvalidActionError
+
         with pytest.raises(InvalidActionError):
             _handle_call_tool(reg, "nonexistent", {})
 

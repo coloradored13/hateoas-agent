@@ -48,8 +48,6 @@ def orchestrator_to_mermaid(orchestrator: "Orchestrator") -> str:
         agents = orchestrator.get_agents_for_phase(phase_name)
         if agents:
             agent_str = ", ".join(a.name for a in agents)
-            lines.append(
-                f"    note right of {phase_name} : agents: {agent_str}"
-            )
+            lines.append(f"    note right of {phase_name} : agents: {agent_str}")
 
     return "\n".join(lines)

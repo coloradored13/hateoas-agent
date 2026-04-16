@@ -318,9 +318,7 @@ class Orchestrator:
         if context:
             self._context.update(context)
 
-        outgoing = [
-            t for t in self._transitions if t.from_phase == self._current_phase
-        ]
+        outgoing = [t for t in self._transitions if t.from_phase == self._current_phase]
 
         for trans in outgoing:
             if trans.guard is None or self._eval_guard(trans.guard):
@@ -350,15 +348,10 @@ class Orchestrator:
             task: Task data passed to the executor.
             executor: Override executor for this call.
         """
-        exec_fn = (
-            executor
-            or self._agent_executors.get(agent.name)
-            or self._default_executor
-        )
+        exec_fn = executor or self._agent_executors.get(agent.name) or self._default_executor
         if exec_fn is None:
             raise ValueError(
-                f"No executor for agent '{agent.name}'. "
-                "Provide an executor or call set_executor()."
+                f"No executor for agent '{agent.name}'. Provide an executor or call set_executor()."
             )
 
         agent.status = AgentStatus.RUNNING
@@ -403,11 +396,7 @@ class Orchestrator:
         import asyncio
 
         async def _run_one(agent: AgentSlot) -> AgentResult:
-            exec_fn = (
-                executor
-                or self._agent_executors.get(agent.name)
-                or self._default_executor
-            )
+            exec_fn = executor or self._agent_executors.get(agent.name) or self._default_executor
             if exec_fn is None:
                 return AgentResult(
                     agent_name=agent.name,
@@ -483,9 +472,7 @@ class Orchestrator:
             return {
                 "phase": state.current_phase,
                 "context": state.context,
-                "agents": [
-                    a.name for a in self.get_agents_for_phase(state.current_phase)
-                ],
+                "agents": [a.name for a in self.get_agents_for_phase(state.current_phase)],
                 "_state": state.current_phase,
             }
 
@@ -548,19 +535,15 @@ class Orchestrator:
                 unknown phases.
         """
         if not self._phases:
-            raise ValueError(
-                f"Orchestrator '{self.name}' has no phases defined."
-            )
+            raise ValueError(f"Orchestrator '{self.name}' has no phases defined.")
         for trans in self._transitions:
             if trans.from_phase not in self._phases:
                 raise ValueError(
-                    f"Transition '{trans.name}' references unknown "
-                    f"phase '{trans.from_phase}'"
+                    f"Transition '{trans.name}' references unknown phase '{trans.from_phase}'"
                 )
             if trans.to_phase not in self._phases:
                 raise ValueError(
-                    f"Transition '{trans.name}' references unknown "
-                    f"phase '{trans.to_phase}'"
+                    f"Transition '{trans.name}' references unknown phase '{trans.to_phase}'"
                 )
 
     def filter_actions(
@@ -606,9 +589,7 @@ class Orchestrator:
         """Return ``(from_states, to_state)`` for a transition action."""
         if action_name == "advance":
             # advance can originate from any phase that has outgoing transitions
-            from_phases = sorted(
-                {t.from_phase for t in self._transitions}
-            )
+            from_phases = sorted({t.from_phase for t in self._transitions})
             return (from_phases, None)
         for trans in self._transitions:
             if trans.name == action_name:
@@ -673,9 +654,7 @@ class Orchestrator:
             return raw
         return {}
 
-    def _make_transition_handler(
-        self, trans: TransitionDef
-    ) -> Callable[..., Dict[str, Any]]:
+    def _make_transition_handler(self, trans: TransitionDef) -> Callable[..., Dict[str, Any]]:
         """Create a handler callable for a specific transition.
 
         Tool-provided context is stored under ``_tool_context`` and is NOT
@@ -708,9 +687,7 @@ class Orchestrator:
             return {
                 "phase": state.current_phase,
                 "context": state.context,
-                "agents": [
-                    a.name for a in self.get_agents_for_phase(state.current_phase)
-                ],
+                "agents": [a.name for a in self.get_agents_for_phase(state.current_phase)],
                 "_state": state.current_phase,
             }
 
@@ -739,9 +716,7 @@ class Orchestrator:
             return {
                 "phase": state.current_phase,
                 "context": state.context,
-                "agents": [
-                    a.name for a in self.get_agents_for_phase(state.current_phase)
-                ],
+                "agents": [a.name for a in self.get_agents_for_phase(state.current_phase)],
                 "_state": state.current_phase,
             }
 

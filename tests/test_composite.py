@@ -9,10 +9,20 @@ from hateoas_agent.composite import CompositeRegistry, ToolNameConflictError
 def _make_orders_sm():
     sm = StateMachine("orders", gateway_name="query_orders")
     sm.gateway(description="Query orders", params={"id": "string"})
-    sm.action("approve", description="Approve", from_states=["pending"],
-              to_state="approved", params={"id": "string"})
-    sm.action("ship", description="Ship", from_states=["approved"],
-              to_state="shipped", params={"id": "string"})
+    sm.action(
+        "approve",
+        description="Approve",
+        from_states=["pending"],
+        to_state="approved",
+        params={"id": "string"},
+    )
+    sm.action(
+        "ship",
+        description="Ship",
+        from_states=["approved"],
+        to_state="shipped",
+        params={"id": "string"},
+    )
 
     @sm.on_gateway
     def gw(id=""):
@@ -32,10 +42,20 @@ def _make_orders_sm():
 def _make_inventory_sm():
     sm = StateMachine("inventory", gateway_name="query_inventory")
     sm.gateway(description="Query inventory", params={"sku": "string"})
-    sm.action("restock", description="Restock", from_states=["low"],
-              to_state="in_stock", params={"sku": "string", "qty": "number"})
-    sm.action("reserve", description="Reserve", from_states=["in_stock"],
-              to_state="reserved", params={"sku": "string", "qty": "number"})
+    sm.action(
+        "restock",
+        description="Restock",
+        from_states=["low"],
+        to_state="in_stock",
+        params={"sku": "string", "qty": "number"},
+    )
+    sm.action(
+        "reserve",
+        description="Reserve",
+        from_states=["in_stock"],
+        to_state="reserved",
+        params={"sku": "string", "qty": "number"},
+    )
 
     @sm.on_gateway
     def gw(sku=""):

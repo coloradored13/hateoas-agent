@@ -291,9 +291,7 @@ class TestAdvance:
         state = guarded_orchestrator.advance(context={"exit_gate": "PASS"})
         assert state.current_phase == "synthesis"
         assert state.is_terminal is True
-        assert state.phase_history == [
-            "research", "challenge", "challenge", "synthesis"
-        ]
+        assert state.phase_history == ["research", "challenge", "challenge", "synthesis"]
 
     def test_advance_terminal_no_transitions(self, simple_orchestrator):
         """Advancing from a terminal phase with no outgoing transitions stays."""
@@ -795,15 +793,18 @@ class TestSigmaReviewMapping:
         orch.phase("synthesis", terminal=True)
 
         orch.transition(
-            "research", "challenge",
+            "research",
+            "challenge",
             guard=lambda ctx: ctx.get("convergence_count", 0) >= ctx.get("agent_count", 999),
         )
         orch.transition(
-            "challenge", "synthesis",
+            "challenge",
+            "synthesis",
             guard=lambda ctx: ctx.get("exit_gate") == "PASS" and ctx.get("belief_state", 0) > 0.85,
         )
         orch.transition(
-            "challenge", "challenge",
+            "challenge",
+            "challenge",
             guard=lambda ctx: ctx.get("exit_gate") == "FAIL",
         )
 
@@ -851,6 +852,4 @@ class TestSigmaReviewMapping:
         assert state.current_phase == "synthesis"
         assert state.is_terminal is True
         assert state.context["final_report"] == "synthesized"
-        assert state.phase_history == [
-            "research", "challenge", "challenge", "synthesis"
-        ]
+        assert state.phase_history == ["research", "challenge", "challenge", "synthesis"]

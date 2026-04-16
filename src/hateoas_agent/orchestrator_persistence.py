@@ -64,10 +64,7 @@ def save_orchestrator_checkpoint(orchestrator: Orchestrator) -> Dict[str, Any]:
     Returns:
         Dict suitable for JSON serialization.
     """
-    agent_states = {
-        name: agent.status.value
-        for name, agent in orchestrator._agents.items()
-    }
+    agent_states = {name: agent.status.value for name, agent in orchestrator._agents.items()}
     cp = OrchestratorCheckpoint(
         name=orchestrator.name,
         current_phase=orchestrator._current_phase,

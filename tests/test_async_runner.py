@@ -29,15 +29,18 @@ def review_orchestrator():
     orch.phase("synthesis", terminal=True)
 
     orch.transition(
-        "research", "challenge",
+        "research",
+        "challenge",
         guard=lambda ctx: ctx.get("converged", False),
     )
     orch.transition(
-        "challenge", "synthesis",
+        "challenge",
+        "synthesis",
         guard=lambda ctx: ctx.get("exit_gate") == "PASS",
     )
     orch.transition(
-        "challenge", "challenge",
+        "challenge",
+        "challenge",
         guard=lambda ctx: ctx.get("exit_gate") == "FAIL",
     )
     return orch
@@ -153,9 +156,7 @@ class TestRunAgentsParallel:
     @pytest.mark.asyncio
     async def test_parallel_no_executor_returns_error(self):
         orch = Orchestrator(name="test", agents=[AgentSlot("a1")])
-        results = await orch.run_agents_parallel(
-            list(orch.agents.values()), task="work"
-        )
+        results = await orch.run_agents_parallel(list(orch.agents.values()), task="work")
         assert results[0].status == AgentStatus.ERROR
         assert "No executor" in results[0].error
 
@@ -188,6 +189,7 @@ class TestRunAgentsParallel:
         agents = list(orch.agents.values())
 
         import time
+
         start = time.monotonic()
         results = await orch.run_agents_parallel(agents, task="x")
         elapsed = time.monotonic() - start
@@ -243,9 +245,7 @@ class TestRunOrchestrated:
         assert state.is_terminal is True
         assert state.current_phase == "synthesis"
         assert state.context["challenge_round"] == 2
-        assert state.phase_history == [
-            "research", "challenge", "challenge", "synthesis"
-        ]
+        assert state.phase_history == ["research", "challenge", "challenge", "synthesis"]
 
     @pytest.mark.asyncio
     async def test_async_phase_handler(self):
@@ -290,9 +290,7 @@ class TestRunOrchestrated:
             return {"exit_gate": "PASS"}
 
         runner = AsyncRunner(orch)
-        state = await runner.run_orchestrated(
-            context={"task": "review API"}
-        )
+        state = await runner.run_orchestrated(context={"task": "review API"})
 
         assert state.is_terminal is True
         assert len(state.context["findings"]) == 2  # TA + PS (DA joins at challenge)

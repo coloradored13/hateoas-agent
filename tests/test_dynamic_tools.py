@@ -1,13 +1,9 @@
 """Tests for dynamic tool registration (get_current_tool_schemas + Runner refresh)."""
 
-import json
 from types import SimpleNamespace
-from unittest.mock import MagicMock, call
-
-import pytest
+from unittest.mock import MagicMock
 
 from hateoas_agent import Registry, Runner, StateMachine
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -30,14 +26,29 @@ def _make_machine():
     """State machine with gateway + 2 states to test dynamic tool changes."""
     sm = StateMachine("files", gateway_name="open_folder")
     sm.gateway(description="Open a folder", params={"path": "string"})
-    sm.state("browsing", actions=[
-        {"name": "select_file", "description": "Select a file", "params": {"name": "string"}, "required": ["name"]},
-        {"name": "create_file", "description": "Create a new file", "params": {"name": "string"}},
-    ])
-    sm.state("editing", actions=[
-        {"name": "save_file", "description": "Save the file"},
-        {"name": "close_file", "description": "Close and go back"},
-    ])
+    sm.state(
+        "browsing",
+        actions=[
+            {
+                "name": "select_file",
+                "description": "Select a file",
+                "params": {"name": "string"},
+                "required": ["name"],
+            },
+            {
+                "name": "create_file",
+                "description": "Create a new file",
+                "params": {"name": "string"},
+            },
+        ],
+    )
+    sm.state(
+        "editing",
+        actions=[
+            {"name": "save_file", "description": "Save the file"},
+            {"name": "close_file", "description": "Close and go back"},
+        ],
+    )
 
     @sm.on_gateway
     def handle_open(path=""):
@@ -170,9 +181,12 @@ class TestParamTypeNormalization:
     def test_simple_string_type(self):
         sm = StateMachine("t", gateway_name="g")
         sm.gateway(description="G", params={"x": "string"})
-        sm.state("s", actions=[
-            {"name": "a", "description": "A", "params": {"x": "string"}},
-        ])
+        sm.state(
+            "s",
+            actions=[
+                {"name": "a", "description": "A", "params": {"x": "string"}},
+            ],
+        )
 
         @sm.on_gateway
         def gw():
@@ -192,11 +206,18 @@ class TestParamTypeNormalization:
         """Types like 'string (comma-separated)' normalize to 'string'."""
         sm = StateMachine("t", gateway_name="g")
         sm.gateway(description="G", params={})
-        sm.state("s", actions=[
-            {"name": "a", "description": "A", "params": {
-                "cols": "string (comma-separated column defs)",
-            }},
-        ])
+        sm.state(
+            "s",
+            actions=[
+                {
+                    "name": "a",
+                    "description": "A",
+                    "params": {
+                        "cols": "string (comma-separated column defs)",
+                    },
+                },
+            ],
+        )
 
         @sm.on_gateway
         def gw():
@@ -217,9 +238,12 @@ class TestParamTypeNormalization:
     def test_integer_type(self):
         sm = StateMachine("t", gateway_name="g")
         sm.gateway(description="G", params={})
-        sm.state("s", actions=[
-            {"name": "a", "description": "A", "params": {"n": "integer"}},
-        ])
+        sm.state(
+            "s",
+            actions=[
+                {"name": "a", "description": "A", "params": {"n": "integer"}},
+            ],
+        )
 
         @sm.on_gateway
         def gw():
@@ -239,9 +263,12 @@ class TestParamTypeNormalization:
         """Unrecognized types fall back to 'string'."""
         sm = StateMachine("t", gateway_name="g")
         sm.gateway(description="G", params={})
-        sm.state("s", actions=[
-            {"name": "a", "description": "A", "params": {"x": "foobar"}},
-        ])
+        sm.state(
+            "s",
+            actions=[
+                {"name": "a", "description": "A", "params": {"x": "foobar"}},
+            ],
+        )
 
         @sm.on_gateway
         def gw():
@@ -289,7 +316,7 @@ class TestRunnerDynamicTools:
         ]
 
         runner = Runner(sm, client=mock_client)
-        result = runner.run("Open /tmp and read a.txt")
+        runner.run("Open /tmp and read a.txt")
 
         # Verify the API was called 3 times
         assert mock_client.messages.create.call_count == 3

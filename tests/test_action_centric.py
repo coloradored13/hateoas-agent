@@ -95,9 +95,12 @@ class TestActionMethod:
 
     def test_no_metadata_for_state_centric_action(self):
         sm = StateMachine("test", gateway_name="gw")
-        sm.state("pending", actions=[
-            {"name": "approve", "description": "Approve", "params": {"id": "string"}},
-        ])
+        sm.state(
+            "pending",
+            actions=[
+                {"name": "approve", "description": "Approve", "params": {"id": "string"}},
+            ],
+        )
 
         assert sm.get_transition_metadata("approve") is None
 
@@ -154,9 +157,12 @@ class TestMixingActionAndState:
     def test_both_contribute_to_same_state(self):
         sm = StateMachine("test", gateway_name="gw")
         sm.gateway(description="GW", params={})
-        sm.state("pending", actions=[
-            {"name": "old_action", "description": "Old", "params": {}},
-        ])
+        sm.state(
+            "pending",
+            actions=[
+                {"name": "old_action", "description": "Old", "params": {}},
+            ],
+        )
         sm.action(
             "new_action",
             description="New",
@@ -171,9 +177,12 @@ class TestMixingActionAndState:
     def test_action_centric_takes_precedence(self):
         sm = StateMachine("test", gateway_name="gw")
         sm.gateway(description="GW", params={})
-        sm.state("pending", actions=[
-            {"name": "cancel", "description": "Old desc", "params": {}},
-        ])
+        sm.state(
+            "pending",
+            actions=[
+                {"name": "cancel", "description": "Old desc", "params": {}},
+            ],
+        )
         sm.action(
             "cancel",
             description="New desc",
@@ -189,9 +198,12 @@ class TestMixingActionAndState:
     def test_universal_action_with_state_centric(self):
         sm = StateMachine("test", gateway_name="gw")
         sm.gateway(description="GW", params={})
-        sm.state("pending", actions=[
-            {"name": "approve", "description": "Approve", "params": {}},
-        ])
+        sm.state(
+            "pending",
+            actions=[
+                {"name": "approve", "description": "Approve", "params": {}},
+            ],
+        )
         sm.action("add_note", description="Note", from_states="*", params={})
 
         actions = sm.get_actions_for_state("pending")
@@ -254,17 +266,23 @@ class TestGetAllActionNames:
 
     def test_includes_state_centric(self):
         sm = StateMachine("test", gateway_name="gw")
-        sm.state("pending", actions=[
-            {"name": "approve", "description": "Approve", "params": {}},
-        ])
+        sm.state(
+            "pending",
+            actions=[
+                {"name": "approve", "description": "Approve", "params": {}},
+            ],
+        )
 
         assert "approve" in sm.get_all_action_names()
 
     def test_union_of_both(self):
         sm = StateMachine("test", gateway_name="gw")
-        sm.state("pending", actions=[
-            {"name": "state_action", "description": "State", "params": {}},
-        ])
+        sm.state(
+            "pending",
+            actions=[
+                {"name": "state_action", "description": "State", "params": {}},
+            ],
+        )
         sm.action("action_action", description="Action", from_states=["pending"], params={})
 
         names = sm.get_all_action_names()

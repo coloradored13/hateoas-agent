@@ -124,15 +124,18 @@ class TestOrchestratorToMermaid:
         orch.phase("synthesis", terminal=True)
 
         orch.transition(
-            "research", "challenge",
+            "research",
+            "challenge",
             guard=belief_above(0.7),
         )
         orch.transition(
-            "challenge", "synthesis",
+            "challenge",
+            "synthesis",
             guard=belief_above(0.85) & exit_gate_passed(),
         )
         orch.transition(
-            "challenge", "challenge",
+            "challenge",
+            "challenge",
             name="retry",
         )
 

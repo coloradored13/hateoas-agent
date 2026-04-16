@@ -114,9 +114,7 @@ class AsyncRunner:
         if context:
             orch._context.update(context)
 
-        outgoing = [
-            t for t in orch._transitions if t.from_phase == orch._current_phase
-        ]
+        outgoing = [t for t in orch._transitions if t.from_phase == orch._current_phase]
 
         for trans in outgoing:
             if trans.guard is None or orch._eval_guard(trans.guard):

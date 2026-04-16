@@ -200,8 +200,7 @@ class Resource:
         if missing:
             unique_missing = sorted(set(missing))
             raise ValueError(
-                f"Resource '{self.name}' has actions without handlers: "
-                f"{', '.join(unique_missing)}."
+                f"Resource '{self.name}' has actions without handlers: {', '.join(unique_missing)}."
             )
 
     def filter_actions(

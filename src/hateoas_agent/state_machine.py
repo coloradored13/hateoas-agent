@@ -34,9 +34,7 @@ class StateMachine:
     available in every state and transitions are logged for later analysis.
     """
 
-    def __init__(
-        self, name: str, gateway_name: str = "gateway", *, mode: str = "strict"
-    ):
+    def __init__(self, name: str, gateway_name: str = "gateway", *, mode: str = "strict"):
         if mode not in ("strict", "discover"):
             raise ValueError(f"mode must be 'strict' or 'discover', got {mode!r}")
         if mode == "discover":
@@ -324,8 +322,7 @@ class StateMachine:
         """
         if self._gateway_def is None:
             raise ValueError(
-                f"StateMachine '{self.name}' has no gateway defined. "
-                f"Call .gateway() before using."
+                f"StateMachine '{self.name}' has no gateway defined. Call .gateway() before using."
             )
         if self._gateway_handler is None:
             raise ValueError(

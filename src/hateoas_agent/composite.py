@@ -16,8 +16,7 @@ class ToolNameConflictError(HateoasError):
         self.tool_name = tool_name
         self.resources = resources
         super().__init__(
-            f"Tool name '{tool_name}' conflicts between resources: "
-            f"{', '.join(resources)}"
+            f"Tool name '{tool_name}' conflicts between resources: {', '.join(resources)}"
         )
 
 

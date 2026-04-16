@@ -41,9 +41,12 @@ class TestDiscoveryModeStateMachine:
     def test_mixed_state_and_action_in_discover(self):
         sm = StateMachine("test", gateway_name="gw", mode="discover")
         sm.gateway(description="GW", params={})
-        sm.state("pending", actions=[
-            {"name": "old_action", "description": "Old", "params": {}},
-        ])
+        sm.state(
+            "pending",
+            actions=[
+                {"name": "old_action", "description": "Old", "params": {}},
+            ],
+        )
         sm.action("new_action", description="New", params={})
 
         # "pending" has both; action-centric always available
@@ -191,12 +194,14 @@ class TestDiscoveryReport:
     """Tests for DiscoveryReport methods."""
 
     def _make_report(self):
-        return DiscoveryReport(transitions=[
-            TransitionRecord("pending", "approve", "approved", 1.0),
-            TransitionRecord("pending", "cancel", "cancelled", 2.0),
-            TransitionRecord("approved", "ship", "shipped", 3.0),
-            TransitionRecord("approved", "cancel", "cancelled", 4.0),
-        ])
+        return DiscoveryReport(
+            transitions=[
+                TransitionRecord("pending", "approve", "approved", 1.0),
+                TransitionRecord("pending", "cancel", "cancelled", 2.0),
+                TransitionRecord("approved", "ship", "shipped", 3.0),
+                TransitionRecord("approved", "cancel", "cancelled", 4.0),
+            ]
+        )
 
     def test_to_state_map(self):
         report = self._make_report()
@@ -224,10 +229,12 @@ class TestDiscoveryReport:
 
     def test_to_action_map_multiple_to_states(self):
         """Action that transitions to different states → to_state is None."""
-        report = DiscoveryReport(transitions=[
-            TransitionRecord("a", "do_thing", "b", 1.0),
-            TransitionRecord("a", "do_thing", "c", 2.0),
-        ])
+        report = DiscoveryReport(
+            transitions=[
+                TransitionRecord("a", "do_thing", "b", 1.0),
+                TransitionRecord("a", "do_thing", "c", 2.0),
+            ]
+        )
         action_map = report.to_action_map()
         assert action_map["do_thing"]["to_state"] is None
 
@@ -241,9 +248,11 @@ class TestDiscoveryReport:
         assert 'orders.action("cancel"' in code
 
     def test_to_python_custom_var_name(self):
-        report = DiscoveryReport(transitions=[
-            TransitionRecord("a", "do_thing", "b", 1.0),
-        ])
+        report = DiscoveryReport(
+            transitions=[
+                TransitionRecord("a", "do_thing", "b", 1.0),
+            ]
+        )
         code = report.to_python("my_sm")
         assert 'my_sm.action("do_thing"' in code
 
@@ -314,9 +323,7 @@ class TestToStateWarning:
         with caplog.at_level(logging.WARNING, logger="hateoas_agent.registry"):
             reg.handle_tool_call("approve", {"id": "1"})
 
-        assert not any(
-            "declared to_state" in r.message for r in caplog.records
-        )
+        assert not any("declared to_state" in r.message for r in caplog.records)
 
     def test_no_warning_when_no_to_state_declared(self, caplog):
         sm = StateMachine("test", gateway_name="gw")
@@ -342,6 +349,4 @@ class TestToStateWarning:
         with caplog.at_level(logging.WARNING, logger="hateoas_agent.registry"):
             reg.handle_tool_call("add_note", {})
 
-        assert not any(
-            "declared to_state" in r.message for r in caplog.records
-        )
+        assert not any("declared to_state" in r.message for r in caplog.records)

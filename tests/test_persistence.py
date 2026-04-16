@@ -22,8 +22,12 @@ class TestRegistryCheckpoint:
             last_state="approved",
             last_result={"order": {"id": "1"}},
             transitions=[
-                {"state_before": "pending", "action": "approve",
-                 "state_after": "approved", "timestamp": 1.0},
+                {
+                    "state_before": "pending",
+                    "action": "approve",
+                    "state_after": "approved",
+                    "timestamp": 1.0,
+                },
             ],
             timestamp=100.0,
         )
@@ -117,8 +121,13 @@ class TestRegistrySaveLoad:
     def _make_sm(self):
         sm = StateMachine("test", gateway_name="gw")
         sm.gateway(description="GW", params={"id": "string"})
-        sm.action("approve", description="Approve", from_states=["pending"],
-                  to_state="approved", params={"id": "string"})
+        sm.action(
+            "approve",
+            description="Approve",
+            from_states=["pending"],
+            to_state="approved",
+            params={"id": "string"},
+        )
 
         @sm.on_gateway
         def gw(id=""):
@@ -176,10 +185,12 @@ class TestDiscoveryReportPersistence:
     """Tests for DiscoveryReport JSON serialization."""
 
     def test_to_json_and_from_json(self):
-        report = DiscoveryReport(transitions=[
-            TransitionRecord("pending", "approve", "approved", 1.0),
-            TransitionRecord("approved", "ship", "shipped", 2.0),
-        ])
+        report = DiscoveryReport(
+            transitions=[
+                TransitionRecord("pending", "approve", "approved", 1.0),
+                TransitionRecord("approved", "ship", "shipped", 2.0),
+            ]
+        )
 
         j = report.to_json()
         restored = DiscoveryReport.from_json(j)
@@ -196,10 +207,12 @@ class TestDiscoveryReportPersistence:
         assert len(restored.transitions) == 0
 
     def test_state_map_preserved(self):
-        report = DiscoveryReport(transitions=[
-            TransitionRecord("a", "go", "b", 1.0),
-            TransitionRecord("b", "back", "a", 2.0),
-        ])
+        report = DiscoveryReport(
+            transitions=[
+                TransitionRecord("a", "go", "b", 1.0),
+                TransitionRecord("b", "back", "a", 2.0),
+            ]
+        )
 
         j = report.to_json()
         restored = DiscoveryReport.from_json(j)
@@ -214,8 +227,10 @@ class TestRunnerSaveLoadCheckpoint:
         sm = StateMachine("test", gateway_name="gw")
         sm.gateway(description="GW", params={"id": "string"})
         sm.action(
-            "approve", description="Approve",
-            from_states=["pending"], to_state="approved",
+            "approve",
+            description="Approve",
+            from_states=["pending"],
+            to_state="approved",
             params={"id": "string"},
         )
 
@@ -234,6 +249,7 @@ class TestRunnerSaveLoadCheckpoint:
         from unittest.mock import MagicMock
 
         from hateoas_agent.runner import Runner
+
         mock_client = MagicMock()
         return Runner(sm, client=mock_client)
 
@@ -292,7 +308,8 @@ class TestRunnerSaveLoadCheckpoint:
 
         runner2 = self._make_runner(sm)
         restored_msgs, restored_tc = load_runner_checkpoint(
-            runner2, restored_data,
+            runner2,
+            restored_data,
         )
         assert runner2._registry._last_state == "approved"
         assert len(restored_msgs) == 1
@@ -312,8 +329,10 @@ class TestRunnerSaveLoadCheckpoint:
                 "content": [
                     {"type": "text", "text": "I'll help"},
                     {
-                        "type": "tool_use", "id": "t1",
-                        "name": "gw", "input": {"id": "1"},
+                        "type": "tool_use",
+                        "id": "t1",
+                        "name": "gw",
+                        "input": {"id": "1"},
                     },
                 ],
             },

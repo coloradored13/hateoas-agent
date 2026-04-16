@@ -86,9 +86,12 @@ class TestValidate:
     def test_state_centric_missing_handler_raises(self):
         sm = StateMachine("test", gateway_name="gw")
         sm.gateway(description="GW", params={})
-        sm.state("active", actions=[
-            {"name": "do_thing", "description": "Do", "params": {}},
-        ])
+        sm.state(
+            "active",
+            actions=[
+                {"name": "do_thing", "description": "Do", "params": {}},
+            ],
+        )
 
         @sm.on_gateway
         def gw():

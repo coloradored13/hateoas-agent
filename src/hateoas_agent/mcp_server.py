@@ -41,9 +41,7 @@ def _build_tool_schemas(registry: Any) -> list:
             Tool(
                 name=schema["name"],
                 description=schema.get("description", ""),
-                inputSchema=schema.get(
-                    "input_schema", {"type": "object", "properties": {}}
-                ),
+                inputSchema=schema.get("input_schema", {"type": "object", "properties": {}}),
             )
         )
     return tools
@@ -109,10 +107,8 @@ def serve(
     @server.call_tool()
     async def call_tool(tool_name: str, arguments: dict | None = None):
         try:
-            result_text, state_changed = _handle_call_tool(
-                registry, tool_name, arguments or {}
-            )
-        except Exception as exc:
+            result_text, state_changed = _handle_call_tool(registry, tool_name, arguments or {})
+        except Exception:
             logger.exception("Tool call '%s' failed", tool_name)
             return CallToolResult(
                 content=[TextContent(type="text", text="An internal error occurred.")],

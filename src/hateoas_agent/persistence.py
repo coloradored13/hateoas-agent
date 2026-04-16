@@ -7,7 +7,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
-from .types import DiscoveryReport, TransitionRecord
+from .types import TransitionRecord
 
 
 @dataclass

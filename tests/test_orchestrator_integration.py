@@ -36,8 +36,7 @@ class TestSigmaReviewEndToEnd:
                 AgentSlot("tech-architect", role="Architecture analysis"),
                 AgentSlot("product-strategist", role="Market viability"),
                 AgentSlot("ux-researcher", role="User experience"),
-                AgentSlot("devils-advocate", role="Adversarial challenge",
-                          join_phase="challenge"),
+                AgentSlot("devils-advocate", role="Adversarial challenge", join_phase="challenge"),
             ],
         )
 
@@ -46,15 +45,18 @@ class TestSigmaReviewEndToEnd:
         review.phase("synthesis", description="Final report", terminal=True)
 
         review.transition(
-            "research", "challenge",
+            "research",
+            "challenge",
             guard=all_converged() & belief_above(0.7),
         )
         review.transition(
-            "challenge", "synthesis",
+            "challenge",
+            "synthesis",
             guard=exit_gate_passed() & belief_above(0.85),
         )
         review.transition(
-            "challenge", "challenge",
+            "challenge",
+            "challenge",
             guard=~exit_gate_passed() & round_limit(5),
         )
 
@@ -72,9 +74,7 @@ class TestSigmaReviewEndToEnd:
 
         @review.on_phase("research")
         async def handle_research(orchestrator, agents, context):
-            results = await orchestrator.run_agents_parallel(
-                agents, task=context.get("task", "")
-            )
+            results = await orchestrator.run_agents_parallel(agents, task=context.get("task", ""))
             return {
                 "findings": [r.output for r in results],
                 "agent_statuses": [r.status.value for r in results],
@@ -84,9 +84,7 @@ class TestSigmaReviewEndToEnd:
         @review.on_phase("challenge")
         async def handle_challenge(orchestrator, agents, context):
             round_num = context.get("round", 0) + 1
-            results = await orchestrator.run_agents_parallel(
-                agents, task="challenge round"
-            )
+            results = await orchestrator.run_agents_parallel(agents, task="challenge round")
             # Simulate: round 1 fails, round 2 passes
             if round_num < 2:
                 return {
@@ -107,17 +105,13 @@ class TestSigmaReviewEndToEnd:
             return {"final_report": "Review complete", "round": context["round"]}
 
         runner = AsyncRunner(review)
-        state = await runner.run_orchestrated(
-            context={"task": "Evaluate HATEOAS v0.2 API design"}
-        )
+        state = await runner.run_orchestrated(context={"task": "Evaluate HATEOAS v0.2 API design"})
 
         assert state.is_terminal is True
         assert state.current_phase == "synthesis"
         assert state.context["final_report"] == "Review complete"
         assert state.context["round"] == 2
-        assert state.phase_history == [
-            "research", "challenge", "challenge", "synthesis"
-        ]
+        assert state.phase_history == ["research", "challenge", "challenge", "synthesis"]
 
     def test_registry_integration_full_workflow(self):
         """Orchestrator works through Registry for tool routing."""
@@ -196,11 +190,13 @@ class TestSigmaReviewEndToEnd:
         assert review2.get_agent("tech-architect").status == AgentStatus.CONVERGED
 
         # Continue from where we left off — provide context so synthesis guard passes
-        state = review2.advance(context={
-            "exit_gate": "PASS",
-            "belief_state": 0.9,
-            "agent_statuses": ["converged", "converged", "converged"],
-        })
+        state = review2.advance(
+            context={
+                "exit_gate": "PASS",
+                "belief_state": 0.9,
+                "agent_statuses": ["converged", "converged", "converged"],
+            }
+        )
         assert state.current_phase == "synthesis"
         assert state.is_terminal is True
 
@@ -231,10 +227,12 @@ class TestSigmaReviewEndToEnd:
         """Checkpoint survives JSON serialization (for persistence to disk/API)."""
         review = self._build_review()
         review.start(context={"task": "json test", "scores": [1, 2, 3]})
-        review.advance(context={
-            "agent_statuses": ["converged", "converged", "converged"],
-            "belief_state": 0.8,
-        })
+        review.advance(
+            context={
+                "agent_statuses": ["converged", "converged", "converged"],
+                "belief_state": 0.8,
+            }
+        )
 
         data = save_orchestrator_checkpoint(review)
         json_str = json.dumps(data)

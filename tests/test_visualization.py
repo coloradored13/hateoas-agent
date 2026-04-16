@@ -14,12 +14,18 @@ class TestStateMachineToMermaid:
     def test_basic_transitions(self):
         sm = StateMachine("test", gateway_name="gw")
         sm.action(
-            "approve", description="Approve",
-            from_states=["pending"], to_state="approved", params={},
+            "approve",
+            description="Approve",
+            from_states=["pending"],
+            to_state="approved",
+            params={},
         )
         sm.action(
-            "ship", description="Ship",
-            from_states=["approved"], to_state="shipped", params={},
+            "ship",
+            description="Ship",
+            from_states=["approved"],
+            to_state="shipped",
+            params={},
         )
 
         mermaid = state_machine_to_mermaid(sm)
@@ -31,8 +37,11 @@ class TestStateMachineToMermaid:
     def test_universal_action_rendered_as_note(self):
         sm = StateMachine("test", gateway_name="gw")
         sm.action(
-            "approve", description="Approve",
-            from_states=["pending"], to_state="approved", params={},
+            "approve",
+            description="Approve",
+            from_states=["pending"],
+            to_state="approved",
+            params={},
         )
         sm.action("add_note", description="Note", from_states="*", params={})
 
@@ -65,8 +74,13 @@ class TestStateMachineToMermaid:
 
     def test_multiple_from_states(self):
         sm = StateMachine("test", gateway_name="gw")
-        sm.action("cancel", description="Cancel", from_states=["pending", "approved"],
-                  to_state="cancelled", params={})
+        sm.action(
+            "cancel",
+            description="Cancel",
+            from_states=["pending", "approved"],
+            to_state="cancelled",
+            params={},
+        )
 
         mermaid = state_machine_to_mermaid(sm)
         assert "pending --> cancelled : cancel" in mermaid
@@ -74,18 +88,27 @@ class TestStateMachineToMermaid:
 
     def test_convenience_method(self):
         sm = StateMachine("test", gateway_name="gw")
-        sm.action("approve", description="Approve", from_states=["pending"],
-                  to_state="approved", params={})
+        sm.action(
+            "approve",
+            description="Approve",
+            from_states=["pending"],
+            to_state="approved",
+            params={},
+        )
 
         assert sm.to_mermaid() == state_machine_to_mermaid(sm)
 
     def test_state_centric_states_appear(self):
         sm = StateMachine("test", gateway_name="gw")
-        sm.state("pending", actions=[
-            {"name": "approve", "description": "Approve", "params": {}},
-        ])
-        sm.action("ship", description="Ship", from_states=["approved"],
-                  to_state="shipped", params={})
+        sm.state(
+            "pending",
+            actions=[
+                {"name": "approve", "description": "Approve", "params": {}},
+            ],
+        )
+        sm.action(
+            "ship", description="Ship", from_states=["approved"], to_state="shipped", params={}
+        )
 
         mermaid = state_machine_to_mermaid(sm)
         # Both state-centric and action-centric states should appear
@@ -96,10 +119,12 @@ class TestDiscoveryReportToMermaid:
     """Tests for discovery_report_to_mermaid."""
 
     def test_basic_report(self):
-        report = DiscoveryReport(transitions=[
-            TransitionRecord("pending", "approve", "approved", 1.0),
-            TransitionRecord("approved", "ship", "shipped", 2.0),
-        ])
+        report = DiscoveryReport(
+            transitions=[
+                TransitionRecord("pending", "approve", "approved", 1.0),
+                TransitionRecord("approved", "ship", "shipped", 2.0),
+            ]
+        )
 
         mermaid = discovery_report_to_mermaid(report)
         assert "stateDiagram-v2" in mermaid
@@ -108,11 +133,13 @@ class TestDiscoveryReportToMermaid:
         assert "approved --> shipped : ship" in mermaid
 
     def test_deduplicates_transitions(self):
-        report = DiscoveryReport(transitions=[
-            TransitionRecord("pending", "approve", "approved", 1.0),
-            TransitionRecord("pending", "approve", "approved", 2.0),
-            TransitionRecord("pending", "approve", "approved", 3.0),
-        ])
+        report = DiscoveryReport(
+            transitions=[
+                TransitionRecord("pending", "approve", "approved", 1.0),
+                TransitionRecord("pending", "approve", "approved", 2.0),
+                TransitionRecord("pending", "approve", "approved", 3.0),
+            ]
+        )
 
         mermaid = discovery_report_to_mermaid(report)
         # Should only appear once
@@ -124,16 +151,20 @@ class TestDiscoveryReportToMermaid:
         assert mermaid == "stateDiagram-v2"
 
     def test_convenience_method(self):
-        report = DiscoveryReport(transitions=[
-            TransitionRecord("a", "go", "b", 1.0),
-        ])
+        report = DiscoveryReport(
+            transitions=[
+                TransitionRecord("a", "go", "b", 1.0),
+            ]
+        )
 
         assert report.to_mermaid() == discovery_report_to_mermaid(report)
 
     def test_self_transition(self):
-        report = DiscoveryReport(transitions=[
-            TransitionRecord("pending", "add_note", "pending", 1.0),
-        ])
+        report = DiscoveryReport(
+            transitions=[
+                TransitionRecord("pending", "add_note", "pending", 1.0),
+            ]
+        )
 
         mermaid = discovery_report_to_mermaid(report)
         assert "pending --> pending : add_note" in mermaid

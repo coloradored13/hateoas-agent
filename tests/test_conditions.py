@@ -1,6 +1,5 @@
 """Tests for composable guard conditions."""
 
-
 from hateoas_agent.agent_slot import AgentStatus
 from hateoas_agent.conditions import (
     all_converged,
@@ -169,20 +168,30 @@ class TestComposition:
         cond = (all_converged() & belief_above(0.85)) | exit_gate_passed()
 
         # All converged + high belief -> True
-        assert cond({
-            "agent_statuses": ["converged", "converged"],
-            "belief_state": 0.9,
-        }) is True
+        assert (
+            cond(
+                {
+                    "agent_statuses": ["converged", "converged"],
+                    "belief_state": 0.9,
+                }
+            )
+            is True
+        )
 
         # Exit gate passed alone -> True
         assert cond({"exit_gate": "PASS"}) is True
 
         # Neither -> False
-        assert cond({
-            "agent_statuses": ["converged", "running"],
-            "belief_state": 0.5,
-            "exit_gate": "FAIL",
-        }) is False
+        assert (
+            cond(
+                {
+                    "agent_statuses": ["converged", "running"],
+                    "belief_state": 0.5,
+                    "exit_gate": "FAIL",
+                }
+            )
+            is False
+        )
 
     def test_triple_and(self):
         cond = all_converged() & belief_above(0.85) & exit_gate_passed()
@@ -233,15 +242,19 @@ class TestConditionsWithOrchestrator:
         orch.phase("challenge")
         orch.phase("synthesis", terminal=True)
         orch.transition(
-            "challenge", "synthesis",
+            "challenge",
+            "synthesis",
             guard=all_converged() & belief_above(0.85) & exit_gate_passed(),
         )
 
-        orch.start("challenge", context={
-            "agent_statuses": ["converged", "converged"],
-            "belief_state": 0.9,
-            "exit_gate": "PASS",
-        })
+        orch.start(
+            "challenge",
+            context={
+                "agent_statuses": ["converged", "converged"],
+                "belief_state": 0.9,
+                "exit_gate": "PASS",
+            },
+        )
         state = orch.advance()
         assert state.current_phase == "synthesis"
 
@@ -250,19 +263,24 @@ class TestConditionsWithOrchestrator:
         orch.phase("challenge")
         orch.phase("synthesis", terminal=True)
         orch.transition(
-            "challenge", "synthesis",
+            "challenge",
+            "synthesis",
             guard=all_converged() & belief_above(0.85) & exit_gate_passed(),
         )
         orch.transition(
-            "challenge", "challenge",
+            "challenge",
+            "challenge",
             guard=~exit_gate_passed(),
         )
 
-        orch.start("challenge", context={
-            "agent_statuses": ["converged"],
-            "belief_state": 0.9,
-            "exit_gate": "FAIL",
-        })
+        orch.start(
+            "challenge",
+            context={
+                "agent_statuses": ["converged"],
+                "belief_state": 0.9,
+                "exit_gate": "FAIL",
+            },
+        )
         state = orch.advance()
         assert state.current_phase == "challenge"  # self-loop via ~exit_gate_passed
 
