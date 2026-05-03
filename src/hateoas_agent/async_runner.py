@@ -75,8 +75,20 @@ class AsyncRunner:
             prev_len = len(state.phase_history)
             state = await self._async_advance()
             if len(state.phase_history) == prev_len:
-                # No transition happened — all guards failed
+                logger.warning(
+                    "AsyncRunner stalled at phase %r — no outgoing transition "
+                    "guard matched. Workflow exited without reaching a terminal "
+                    "phase.",
+                    state.current_phase,
+                )
                 break
+        else:
+            logger.warning(
+                "AsyncRunner exhausted max_iterations=%d at phase %r without "
+                "reaching a terminal phase. Workflow may be looping.",
+                self._max_iterations,
+                state.current_phase,
+            )
 
         return state
 

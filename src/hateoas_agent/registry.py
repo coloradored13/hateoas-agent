@@ -94,6 +94,13 @@ def _normalize_param_type(raw_type: str) -> Dict[str, str]:
     raw = raw_type.strip()
     base = raw.split("(")[0].split(" ")[0].strip().lower()
     if base not in _VALID_JSON_SCHEMA_TYPES:
+        logger.warning(
+            "Unrecognized parameter type %r (parsed base %r); falling back to "
+            "'string'. Valid JSON Schema types: %s",
+            raw_type,
+            base,
+            sorted(_VALID_JSON_SCHEMA_TYPES),
+        )
         base = "string"
     prop: Dict[str, str] = {"type": base}
     # If the original had extra description beyond the type, preserve it
