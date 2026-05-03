@@ -97,7 +97,8 @@ class StateMachine:
             logger.warning(
                 "StateMachine '%s' (discover mode) registered state %r — "
                 "all actions remain universally available.",
-                self.name, name,
+                self.name,
+                name,
             )
         action_defs = []
         for a in actions or []:
@@ -195,7 +196,8 @@ class StateMachine:
             logger.warning(
                 "StateMachine '%s' (discover mode) registered action %r — "
                 "available in ALL states. Do not use in production.",
-                self.name, name,
+                self.name,
+                name,
             )
 
     def on_gateway(self, fn: Callable) -> Callable:

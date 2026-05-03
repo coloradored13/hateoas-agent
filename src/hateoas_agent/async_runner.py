@@ -86,7 +86,8 @@ class AsyncRunner:
             logger.warning(
                 "AsyncRunner exhausted max_iterations=%d at phase %r without "
                 "reaching a terminal phase. Workflow may be looping.",
-                self._max_iterations, state.current_phase,
+                self._max_iterations,
+                state.current_phase,
             )
 
         return state

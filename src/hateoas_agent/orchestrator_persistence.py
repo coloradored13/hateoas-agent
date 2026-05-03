@@ -105,5 +105,6 @@ def load_orchestrator_checkpoint(
             logger.warning(
                 "Checkpoint contains agent %r not present in orchestrator %r; "
                 "agent state discarded.",
-                agent_name, orchestrator.name,
+                agent_name,
+                orchestrator.name,
             )

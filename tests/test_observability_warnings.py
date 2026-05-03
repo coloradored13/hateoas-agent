@@ -31,10 +31,7 @@ class TestDiscoverModeRepeatedWarning:
         sm = StateMachine("t", gateway_name="gw", mode="discover")
         with caplog.at_level(logging.WARNING, logger="hateoas_agent.state_machine"):
             sm.action("approve", description="A", params={})
-        assert any(
-            "discover mode" in r.message and "approve" in r.message
-            for r in caplog.records
-        )
+        assert any("discover mode" in r.message and "approve" in r.message for r in caplog.records)
 
     def test_action_in_strict_mode_does_not_warn(self, caplog):
         sm = StateMachine("t", gateway_name="gw")
@@ -77,23 +74,16 @@ class TestDroppedAgentWarning:
 
         # Fresh orchestrator missing one of the saved agents
         orch_b = self._orch(["alpha"])
-        with caplog.at_level(
-            logging.WARNING, logger="hateoas_agent.orchestrator_persistence"
-        ):
+        with caplog.at_level(logging.WARNING, logger="hateoas_agent.orchestrator_persistence"):
             load_orchestrator_checkpoint(orch_b, cp)
 
-        assert any(
-            "beta" in r.message and "discarded" in r.message
-            for r in caplog.records
-        )
+        assert any("beta" in r.message and "discarded" in r.message for r in caplog.records)
 
     def test_matching_agents_emit_no_warning(self, caplog):
         orch_a = self._orch(["alpha", "beta"])
         cp = save_orchestrator_checkpoint(orch_a)
         orch_b = self._orch(["alpha", "beta"])
-        with caplog.at_level(
-            logging.WARNING, logger="hateoas_agent.orchestrator_persistence"
-        ):
+        with caplog.at_level(logging.WARNING, logger="hateoas_agent.orchestrator_persistence"):
             load_orchestrator_checkpoint(orch_b, cp)
         assert not any("discarded" in r.message for r in caplog.records)
 
@@ -110,10 +100,7 @@ class TestAsyncRunnerStallAndMaxIters:
         with caplog.at_level(logging.WARNING, logger="hateoas_agent.async_runner"):
             asyncio.run(runner.run_orchestrated())
 
-        assert any(
-            "stalled" in r.message and "p1" in r.message
-            for r in caplog.records
-        )
+        assert any("stalled" in r.message and "p1" in r.message for r in caplog.records)
 
     def test_max_iters_warns(self, caplog):
         orch = Orchestrator(name="r", agents=[AgentSlot("a", role="r")])
@@ -125,10 +112,7 @@ class TestAsyncRunnerStallAndMaxIters:
         with caplog.at_level(logging.WARNING, logger="hateoas_agent.async_runner"):
             asyncio.run(runner.run_orchestrated())
 
-        assert any(
-            "exhausted max_iterations" in r.message
-            for r in caplog.records
-        )
+        assert any("exhausted max_iterations" in r.message for r in caplog.records)
 
     def test_terminal_exit_does_not_warn(self, caplog):
         orch = Orchestrator(name="r", agents=[AgentSlot("a", role="r")])

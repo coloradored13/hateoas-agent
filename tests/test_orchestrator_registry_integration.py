@@ -31,7 +31,8 @@ class TestGuardSeesOrchestratorContextViaRegistry:
     def test_context_true_factory_works_through_registry(self):
         orch = _two_phase_orch()
         orch.transition(
-            "research", "challenge",
+            "research",
+            "challenge",
             guard=context_true("converged"),
             name="advance_to_challenge",
         )
@@ -53,7 +54,8 @@ class TestGuardSeesOrchestratorContextViaRegistry:
     def test_belief_above_factory_works_through_registry(self):
         orch = _two_phase_orch()
         orch.transition(
-            "research", "challenge",
+            "research",
+            "challenge",
             guard=belief_above(0.5),
             name="advance_to_challenge",
         )
@@ -71,7 +73,8 @@ class TestGuardSeesOrchestratorContextViaRegistry:
     def test_exit_gate_passed_factory_works_through_registry(self):
         orch = _two_phase_orch()
         orch.transition(
-            "research", "challenge",
+            "research",
+            "challenge",
             guard=exit_gate_passed(),
             name="advance_to_challenge",
         )
@@ -89,7 +92,8 @@ class TestGuardSeesOrchestratorContextViaRegistry:
     def test_all_converged_factory_works_through_registry(self):
         orch = _two_phase_orch()
         orch.transition(
-            "research", "challenge",
+            "research",
+            "challenge",
             guard=all_converged(),
             name="advance_to_challenge",
         )
@@ -109,7 +113,8 @@ class TestGuardSeesOrchestratorContextViaRegistry:
         the transition must NOT be advertised."""
         orch = _two_phase_orch()
         orch.transition(
-            "research", "challenge",
+            "research",
+            "challenge",
             guard=context_true("converged"),
             name="advance_to_challenge",
         )
@@ -131,7 +136,8 @@ class TestGuardSeesOrchestratorContextViaRegistry:
         give the same answer about whether the guard passes."""
         orch = _two_phase_orch()
         orch.transition(
-            "research", "challenge",
+            "research",
+            "challenge",
             guard=context_true("converged"),
             name="advance_to_challenge",
         )
@@ -151,8 +157,7 @@ class TestGuardSeesOrchestratorContextViaRegistry:
         # no explicit context arg? (uses self._context)
         actions = orch.get_actions_for_state("research")
         direct_says_available = any(
-            a.name == "advance_to_challenge"
-            for a in orch.filter_actions(actions)
+            a.name == "advance_to_challenge" for a in orch.filter_actions(actions)
         )
 
         assert registry_says_available == direct_says_available
