@@ -7,12 +7,15 @@ JSON-serializable dataclasses with ``to_dict`` / ``from_dict``.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .agent_slot import AgentStatus
 from .orchestrator import Orchestrator
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -98,3 +101,9 @@ def load_orchestrator_checkpoint(
     for agent_name, status_str in cp.agent_states.items():
         if agent_name in orchestrator._agents:
             orchestrator._agents[agent_name].status = AgentStatus(status_str)
+        else:
+            logger.warning(
+                "Checkpoint contains agent %r not present in orchestrator %r; "
+                "agent state discarded.",
+                agent_name, orchestrator.name,
+            )

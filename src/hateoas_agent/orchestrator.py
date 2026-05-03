@@ -610,7 +610,7 @@ class Orchestrator:
         try:
             return guard(self._context)
         except Exception:
-            logger.debug("Guard raised an exception; treating as False", exc_info=True)
+            logger.warning("Guard raised an exception; treating as False", exc_info=True)
             return False
 
     def _execute_phase(self, phase: str) -> None:

@@ -222,7 +222,7 @@ class Resource:
                 if guard(context or {}):
                     result.append(action_def)
             except Exception:
-                logger.debug(
+                logger.warning(
                     "Guard for action '%s' raised; excluding action",
                     action_def.name,
                     exc_info=True,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .types import ActionDef, GatewayDef, StateDef
@@ -80,7 +81,24 @@ class StateMachine:
         name: str,
         actions: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
-        """Define a state and its available actions (state-centric style)."""
+        """Define a state and its available actions (state-centric style).
+
+        .. deprecated:: 0.3
+            Use :meth:`action` (action-centric style) instead. The
+            state-centric API will be removed in a future release.
+        """
+        warnings.warn(
+            f"StateMachine.state() is deprecated; use .action(name, "
+            f"from_states=[...], to_state=...) instead. Called for state {name!r}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if self._mode == "discover":
+            logger.warning(
+                "StateMachine '%s' (discover mode) registered state %r — "
+                "all actions remain universally available.",
+                self.name, name,
+            )
         action_defs = []
         for a in actions or []:
             action_defs.append(
@@ -172,6 +190,13 @@ class StateMachine:
         # Attach handler if already registered
         if name in self._action_handlers:
             action_def.handler = self._action_handlers[name]
+
+        if self._mode == "discover":
+            logger.warning(
+                "StateMachine '%s' (discover mode) registered action %r — "
+                "available in ALL states. Do not use in production.",
+                self.name, name,
+            )
 
     def on_gateway(self, fn: Callable) -> Callable:
         """Decorator to register the gateway handler."""
@@ -307,7 +332,7 @@ class StateMachine:
                 if guard(context or {}):
                     result.append(action_def)
             except Exception:
-                logger.debug(
+                logger.warning(
                     "Guard for action '%s' raised an exception; excluding action",
                     action_def.name,
                     exc_info=True,
