@@ -553,12 +553,16 @@ class Orchestrator:
     ) -> List[ActionDef]:
         """Filter transition actions by evaluating their guards.
 
-        Args:
-            actions: Actions to filter.
-            context: Context dict to evaluate guards against. Falls back
-                to ``self._context`` when not provided.
+        Always evaluates against the orchestrator's own ``_context``,
+        which is the canonical source of truth for guards composed via
+        ``conditions.py`` factories. The ``context`` parameter exists
+        only to satisfy the ``HasHateoas`` protocol; values passed by
+        Registry (the most recent handler return dict, shaped as
+        ``{phase, context, agents, _state}``) are ignored to avoid
+        silently mismatching guard expectations.
         """
-        eval_ctx = context if context is not None else self._context
+        del context  # see docstring; orchestrator._context is canonical
+        eval_ctx = self._context
         result: List[ActionDef] = []
         for action_def in actions:
             if action_def.name == "advance":
@@ -576,7 +580,7 @@ class Orchestrator:
                 if trans.guard(eval_ctx):
                     result.append(action_def)
             except Exception:
-                logger.debug(
+                logger.warning(
                     "Guard for transition '%s' raised; excluding",
                     action_def.name,
                     exc_info=True,
