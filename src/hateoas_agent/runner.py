@@ -11,10 +11,20 @@ try:
 except ImportError:
     anthropic = None  # type: ignore[assignment]
 
-from .errors import InvalidActionError, NoHandlerError, PhantomToolError
+from .errors import (
+    InvalidActionError,
+    NoHandlerError,
+    PhantomToolError,
+    RunnerAPIError,
+)
 from .registry import Registry
 
 logger = logging.getLogger(__name__)
+
+# Anthropic API errors to trap after the SDK exhausts its own retries. Empty when
+# the optional anthropic dependency is absent (e.g. tests with a mock client),
+# so ``except _API_ERRORS`` then catches nothing and behavior is unchanged.
+_API_ERRORS: tuple = (anthropic.APIError,) if anthropic is not None else ()
 
 
 class Runner:
@@ -137,13 +147,24 @@ class Runner:
         tool_trace: List[Dict[str, Any]] = []
 
         for _ in range(self._max_turns):
-            response = self._client.messages.create(
-                model=self._model,
-                max_tokens=self._max_tokens,
-                tools=tools,
-                system=self._system,
-                messages=msgs,
-            )
+            try:
+                response = self._client.messages.create(
+                    model=self._model,
+                    max_tokens=self._max_tokens,
+                    tools=tools,
+                    system=self._system,
+                    messages=msgs,
+                )
+            except _API_ERRORS as e:
+                # SDK retries are exhausted. Don't let the failure discard the
+                # whole run — surface it with the conversation attached so the
+                # caller can resume from msgs instead of starting over.
+                logger.warning(
+                    "Claude API call failed after retries (%s); preserving %d messages for resume.",
+                    type(e).__name__,
+                    len(msgs),
+                )
+                raise RunnerAPIError(e, msgs, tool_trace) from e
 
             msgs.append({"role": "assistant", "content": response.content})
 

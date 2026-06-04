@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import functools
 import logging
+from dataclasses import replace
 from typing import Any, Callable, Dict, List, Optional
 
 from .types import ActionDef, GatewayDef
+from .validation import validate_required_params
 
 logger = logging.getLogger(__name__)
 
@@ -152,8 +154,11 @@ class Resource:
             return None
         method = getattr(self, self._gateway_method)
         gw_def = method._hateoas_gateway
-        gw_def.handler = method
-        return gw_def
+        # ``_hateoas_gateway`` is a single GatewayDef created once at decoration
+        # time and shared by every instance of this class. Binding ``handler``
+        # onto it in place is last-writer-wins: a second instance would clobber
+        # the first instance's handler. Return a per-instance copy instead.
+        return replace(gw_def, handler=method)
 
     def get_actions_for_state(self, state_name: str) -> List[ActionDef]:
         actions = []
@@ -201,6 +206,14 @@ class Resource:
             unique_missing = sorted(set(missing))
             raise ValueError(
                 f"Resource '{self.name}' has actions without handlers: {', '.join(unique_missing)}."
+            )
+        # Required params must be a subset of declared params (else uncallable).
+        gw_method = getattr(self, self._gateway_method)
+        gw_def = gw_method._hateoas_gateway
+        validate_required_params(gw_def.name, gw_def.params, gw_def.required, "Gateway")
+        for action_def in self._action_defs.values():
+            validate_required_params(
+                action_def.name, action_def.params, action_def.required, "Action"
             )
 
     def filter_actions(

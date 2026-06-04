@@ -7,6 +7,7 @@ import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .types import ActionDef, GatewayDef, StateDef
+from .validation import validate_required_params
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +372,22 @@ class StateMachine:
                 f"{', '.join(unique_missing)}. "
                 f"Use @{self.name}.on_action(name) to register handlers."
             )
+        # Required params must be a subset of declared params (else uncallable).
+        validate_required_params(
+            self._gateway_def.name,
+            self._gateway_def.params,
+            self._gateway_def.required,
+            "Gateway",
+        )
+        seen: set[int] = set()
+        action_defs = list(self._action_defs.values())
+        for state_def in self._states.values():
+            action_defs.extend(state_def.actions)
+        for ad in action_defs:
+            if id(ad) in seen:
+                continue
+            seen.add(id(ad))
+            validate_required_params(ad.name, ad.params, ad.required, "Action")
 
     def to_mermaid(self) -> str:
         """Generate a Mermaid stateDiagram-v2 from this state machine.

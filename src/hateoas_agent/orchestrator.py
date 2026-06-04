@@ -624,6 +624,16 @@ class Orchestrator:
             return
 
         agents = self.get_agents_for_phase(phase)
+        if inspect.iscoroutinefunction(handler):
+            # Calling an async handler here would return a never-awaited
+            # coroutine that fails the isinstance(dict) check below, silently
+            # discarding the result and leaving _context stale. The sync
+            # Orchestrator cannot await it — fail loudly and point at AsyncRunner.
+            raise TypeError(
+                f"Phase handler for '{phase}' is async (coroutine function). "
+                f"Orchestrator.start()/advance() are synchronous and cannot await "
+                f"it — drive this orchestrator with AsyncRunner instead."
+            )
         result = handler(self, agents, self._context)
 
         if isinstance(result, dict):
