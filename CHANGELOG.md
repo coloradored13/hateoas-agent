@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **LLM-friendly recoverable errors**: when the model calls a wrong-state action
+  or a phantom tool, the error response now inlines the currently-valid actions
+  (via the previously-unused `format_error_with_actions`) so the model can
+  self-correct in the same turn. This applies to both the `Runner` and the MCP
+  server. Previously the MCP server masked these recoverable errors as a generic
+  "An internal error occurred." — now only genuine handler crashes are generic,
+  and strict-mode `StateTransitionError` still propagates as a developer bug.
+- `Registry.get_current_actions()` — public accessor for the guard-filtered
+  actions valid in the current state (empty before the gateway runs).
+- `tests/test_error_responses.py` — covers friendly error responses across the
+  Runner and MCP paths.
 - **Opt-in transition enforcement**: `Registry(resource, strict_transitions=True)`
   and `Runner(resource, strict_transitions=True)`. When enabled, a handler that
   returns a `_state` other than its action's declared `to_state` raises the new

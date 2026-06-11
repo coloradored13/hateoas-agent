@@ -183,6 +183,17 @@ class Registry:
             actions = self._resource.filter_actions(actions, self._last_result)
         return actions
 
+    def get_current_actions(self) -> List[ActionDef]:
+        """Return the actions valid in the current state (guard-filtered).
+
+        Empty until the gateway has been called. Used to build LLM-friendly
+        error responses that inline the valid next actions so the model can
+        recover in the same turn.
+        """
+        if self._last_state is None:
+            return []
+        return self._get_filtered_actions(self._last_state)
+
     def get_current_tool_schemas(self) -> List[Dict[str, Any]]:
         """Return tool schemas for the gateway plus all actions in the current state.
 

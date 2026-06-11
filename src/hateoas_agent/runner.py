@@ -11,6 +11,7 @@ try:
 except ImportError:
     anthropic = None  # type: ignore[assignment]
 
+from .advertisement import format_error_with_actions
 from .errors import (
     InvalidActionError,
     NoHandlerError,
@@ -204,12 +205,9 @@ class Runner:
                         {
                             "type": "tool_result",
                             "tool_use_id": tu.id,
-                            "content": json.dumps(
-                                {
-                                    "error": f"Unknown tool '{tu.name}'. "
-                                    "Only use actions listed in the most recent "
-                                    "'Available actions' section."
-                                }
+                            "content": format_error_with_actions(
+                                f"Unknown tool '{tu.name}'. Use one of the actions listed below.",
+                                self._registry.get_current_actions(),
                             ),
                             "is_error": True,
                         }
@@ -237,11 +235,10 @@ class Runner:
                         {
                             "type": "tool_result",
                             "tool_use_id": tu.id,
-                            "content": json.dumps(
-                                {
-                                    "error": "That action is not available. "
-                                    "Check 'Available actions' in the most recent tool result.",
-                                }
+                            "content": format_error_with_actions(
+                                f"Action '{tu.name}' is not available in the current "
+                                "state. Use one of the actions listed below.",
+                                self._registry.get_current_actions(),
                             ),
                             "is_error": True,
                         }
