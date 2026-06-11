@@ -33,14 +33,14 @@ class CompositeRegistry:
         result = composite.handle_tool_call("query_orders", {"id": "123"})
     """
 
-    def __init__(self, resources: List[Any]):
+    def __init__(self, resources: List[Any], *, strict_transitions: bool = False):
         self._registries: List[Registry] = []
         self._tool_map: Dict[str, Registry] = {}
         self._gateway_names: List[str] = []
         self._last_active: Optional[Registry] = None
 
         for resource in resources:
-            reg = Registry(resource)
+            reg = Registry(resource, strict_transitions=strict_transitions)
             self._registries.append(reg)
 
             gw_name = reg.gateway_name

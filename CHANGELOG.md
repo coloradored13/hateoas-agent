@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Opt-in transition enforcement**: `Registry(resource, strict_transitions=True)`
+  and `Runner(resource, strict_transitions=True)`. When enabled, a handler that
+  returns a `_state` other than its action's declared `to_state` raises the new
+  `StateTransitionError` and the mismatched state is **not** committed (the
+  resource stays in its prior state). Default behavior is unchanged — the
+  mismatch is logged as a warning and applied — so this is fully back-compatible.
+- `StateTransitionError` exception (exported from the package).
+- `tests/test_state_integrity.py` — formalizes the state-bypass investigation:
+  state injection via tool input is blocked, author-supplied params piped into
+  `_state` are pinned as a known footgun, and `to_state` enforcement is covered
+  in both default and strict modes.
+- PyPI release workflow (trusted publishing) triggered by `v*` tags.
+- Nightly adversarial red-team workflow against the live Claude API
+  (skips when no `ANTHROPIC_API_KEY` secret is configured).
+- `CHANGELOG.md` and `CONTRIBUTING.md`.
+
 ### Changed
 - Default `Runner` model updated from the deprecated `claude-sonnet-4-20250514`
   (retires June 15, 2026) to `claude-opus-4-8` across the runner, README, and
@@ -15,12 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - CI installs the `anthropic` extra so the READ-297 regression tests run;
   those tests now skip gracefully when the optional SDK is absent.
-
-### Added
-- PyPI release workflow (trusted publishing) triggered by `v*` tags.
-- Nightly adversarial red-team workflow against the live Claude API
-  (skips when no `ANTHROPIC_API_KEY` secret is configured).
-- `CHANGELOG.md` and `CONTRIBUTING.md`.
 
 ## [0.2.0] - 2026-05-03
 

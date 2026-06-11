@@ -240,6 +240,9 @@ The framework uses server-side state validation — not prompts — to enforce c
 - **Defensive system prompt** — instructs the LLM to only use actions from the most recent tool result.
 - **Parameter filtering** — handlers only receive declared parameters. Extra keys are stripped. Required parameters are validated before handler execution; missing required params return an error without calling the handler.
 - **State type validation** — `_state` must be a string. Non-string values raise `TypeError`.
+- **Transition enforcement (opt-in)** — pass `strict_transitions=True` to `Runner` or `Registry` to enforce declared `to_state` values: a handler that returns a `_state` other than its action's declared `to_state` raises `StateTransitionError` and the mismatched state is not committed. By default the mismatch is logged as a warning and applied (back-compatible).
+
+> **Threat model.** The model across the API can only emit tool calls — it cannot set the resource's state directly, and it cannot smuggle a `_state` into tool input (undeclared keys are filtered before any handler runs). State only changes through your handlers' return values, which are trusted server-side code. The one way the model gains state control is if a handler pipes an LLM-supplied parameter straight into `_state` (e.g. `return {"_state": params["target"]}`) — **never do that**. See `tests/test_state_integrity.py` for the probes that pin these properties.
 
 **Callbacks and strict mode:**
 

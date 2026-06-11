@@ -16,6 +16,7 @@ from .errors import (
     NoHandlerError,
     PhantomToolError,
     RunnerAPIError,
+    StateTransitionError,
 )
 from .registry import Registry
 
@@ -60,6 +61,7 @@ class Runner:
         on_phantom_tool: Optional[Callable] = None,
         on_transition: Optional[Callable] = None,
         strict: bool = False,
+        strict_transitions: bool = False,
     ):
         # Support list of resources (multi-resource composition)
         if isinstance(resource, list):
@@ -68,11 +70,11 @@ class Runner:
             for r in resource:
                 if hasattr(r, "validate"):
                     r.validate()
-            self._registry = CompositeRegistry(resource)
+            self._registry = CompositeRegistry(resource, strict_transitions=strict_transitions)
         else:
             if hasattr(resource, "validate"):
                 resource.validate()
-            self._registry = Registry(resource)
+            self._registry = Registry(resource, strict_transitions=strict_transitions)
         self._model = model
         self._system = system or self._default_system()
         self._max_turns = max_turns
@@ -258,6 +260,11 @@ class Runner:
                             "is_error": True,
                         }
                     )
+                except StateTransitionError:
+                    # A declared-transition violation is a developer bug, not an
+                    # LLM-adaptable error. Under strict_transitions, surface it
+                    # to the developer rather than burying it as a tool_result.
+                    raise
                 except Exception:
                     logger.exception("Handler error for tool '%s'", tu.name)
                     tool_results.append(

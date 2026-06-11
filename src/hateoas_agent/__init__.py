@@ -27,6 +27,7 @@ from .errors import (
     NoHandlerError,
     PhantomToolError,
     StateNotFoundError,
+    StateTransitionError,
 )
 from .orchestrator import Orchestrator, OrchestratorState, PhaseDef, PhaseResult, TransitionDef
 from .orchestrator_persistence import (
@@ -119,4 +120,5 @@ __all__ = [
     "NoHandlerError",
     "PhantomToolError",
     "StateNotFoundError",
+    "StateTransitionError",
 ]

@@ -42,6 +42,34 @@ class StateNotFoundError(HateoasError):
         super().__init__(f"No actions defined for state '{state}'")
 
 
+class StateTransitionError(HateoasError):
+    """Raised when a handler returns a ``_state`` that violates its declared ``to_state``.
+
+    Only raised when the Registry/Runner is constructed with
+    ``strict_transitions=True``. By default the mismatch is logged as a warning
+    and the returned state is still applied (back-compatible behavior). With
+    strict transitions enabled, the mismatched state is **not** committed — the
+    resource stays in its prior state and this error is raised so the bug
+    surfaces immediately instead of silently landing in an unexpected state.
+
+    Attributes:
+        action: the action whose handler returned the mismatched state.
+        declared_to_state: the ``to_state`` declared on the action.
+        returned_state: the ``_state`` the handler actually returned.
+    """
+
+    def __init__(self, action: str, declared_to_state: str, returned_state: str):
+        self.action = action
+        self.declared_to_state = declared_to_state
+        self.returned_state = returned_state
+        super().__init__(
+            f"Action '{action}' declared to_state='{declared_to_state}' but its "
+            f"handler returned _state='{returned_state}'. With strict_transitions "
+            f"enabled, the declared transition is enforced and this mismatch is an "
+            f"error. Fix the handler's return value or the action's to_state."
+        )
+
+
 class PhantomToolError(HateoasError):
     """Raised when Claude calls a tool that doesn't exist in any state.
 
