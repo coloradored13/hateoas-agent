@@ -7,7 +7,12 @@ import time
 from typing import Any, Dict, List, Optional, Protocol, Tuple, Union, runtime_checkable
 
 from .advertisement import format_result_with_actions
-from .errors import InvalidActionError, NoGatewayError, NoHandlerError
+from .errors import (
+    InvalidActionError,
+    NoGatewayError,
+    NoHandlerError,
+    StateTransitionError,
+)
 from .types import ActionDef, DiscoveryReport, GatewayDef, TransitionRecord
 from .validation import validate_action
 
@@ -134,11 +139,15 @@ class Registry:
     transitions, and formats results with action advertisements.
     """
 
-    def __init__(self, resource: HasHateoas):
+    def __init__(self, resource: HasHateoas, *, strict_transitions: bool = False):
         self._resource = resource
         self._last_state: Optional[str] = None
         self._last_result: Dict[str, Any] = {}
         self._transition_log: List[TransitionRecord] = []
+        # When True, a handler that returns a _state other than its action's
+        # declared to_state raises StateTransitionError (and the bad state is
+        # not committed). When False (default), the mismatch is only logged.
+        self._strict_transitions = strict_transitions
 
     @property
     def gateway_name(self) -> str:
@@ -173,6 +182,17 @@ class Registry:
         if hasattr(self._resource, "filter_actions"):
             actions = self._resource.filter_actions(actions, self._last_result)
         return actions
+
+    def get_current_actions(self) -> List[ActionDef]:
+        """Return the actions valid in the current state (guard-filtered).
+
+        Empty until the gateway has been called. Used to build LLM-friendly
+        error responses that inline the valid next actions so the model can
+        recover in the same turn.
+        """
+        if self._last_state is None:
+            return []
+        return self._get_filtered_actions(self._last_state)
 
     def get_current_tool_schemas(self) -> List[Dict[str, Any]]:
         """Return tool schemas for the gateway plus all actions in the current state.
@@ -273,6 +293,23 @@ class Registry:
         raw_result = handler(**filtered)
         result, state = _extract_state(raw_result)
 
+        # Reconcile the returned state against the action's declared to_state
+        # BEFORE committing it, so strict mode can reject without ever landing
+        # in the unexpected state.
+        if state is not _NO_STATE and hasattr(self._resource, "get_transition_metadata"):
+            meta = self._resource.get_transition_metadata(tool_name)
+            if meta is not None:
+                _, declared_to = meta
+                if declared_to is not None and state != declared_to:
+                    if self._strict_transitions:
+                        raise StateTransitionError(tool_name, declared_to, state)
+                    logger.warning(
+                        "Action '%s' declared to_state='%s' but handler returned _state='%s'",
+                        tool_name,
+                        declared_to,
+                        state,
+                    )
+
         if state is not _NO_STATE:
             self._last_state = state
         elif isinstance(result, dict):
@@ -297,23 +334,6 @@ class Registry:
                     timestamp=time.time(),
                 )
             )
-
-        # Warn if to_state metadata doesn't match actual transition
-        if hasattr(self._resource, "get_transition_metadata"):
-            meta = self._resource.get_transition_metadata(tool_name)
-            if meta is not None:
-                _, declared_to = meta
-                if (
-                    declared_to is not None
-                    and state is not _NO_STATE
-                    and state_after != declared_to
-                ):
-                    logger.warning(
-                        "Action '%s' declared to_state='%s' but handler returned _state='%s'",
-                        tool_name,
-                        declared_to,
-                        state_after,
-                    )
 
         actions = []
         if self._last_state is not None:

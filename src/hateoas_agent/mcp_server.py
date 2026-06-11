@@ -15,6 +15,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from .advertisement import format_error_with_actions
+from .errors import InvalidActionError, NoHandlerError
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,6 +48,24 @@ def _build_tool_schemas(registry: Any) -> list:
             )
         )
     return tools
+
+
+def _recoverable_error_text(registry: Any, tool_name: str, exc: Exception) -> str:
+    """Build an LLM-friendly error message that inlines the valid next actions.
+
+    For a wrong-state action (``InvalidActionError``) or an unknown tool
+    (``NoHandlerError``), the model can recover — so the message names the
+    problem and lists the actions that *are* valid right now, rather than
+    masking it as an opaque internal error.
+    """
+    if isinstance(exc, NoHandlerError):
+        message = f"Unknown tool '{tool_name}'. Use one of the actions listed below."
+    else:
+        message = (
+            f"Action '{tool_name}' is not available in the current state. "
+            "Use one of the actions listed below."
+        )
+    return format_error_with_actions(message, registry.get_current_actions())
 
 
 def _handle_call_tool(registry: Any, name: str, arguments: dict) -> tuple:
@@ -108,6 +129,17 @@ def serve(
     async def call_tool(tool_name: str, arguments: dict | None = None):
         try:
             result_text, state_changed = _handle_call_tool(registry, tool_name, arguments or {})
+        except (InvalidActionError, NoHandlerError) as e:
+            # Recoverable: the client called an action that isn't valid right now
+            # (wrong state, or no such action). Return a friendly error that
+            # inlines the currently-valid actions so the model can self-correct,
+            # rather than masking it as an internal error.
+            return CallToolResult(
+                content=[
+                    TextContent(type="text", text=_recoverable_error_text(registry, tool_name, e))
+                ],
+                isError=True,
+            )
         except Exception:
             logger.exception("Tool call '%s' failed", tool_name)
             return CallToolResult(
