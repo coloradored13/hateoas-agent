@@ -476,7 +476,7 @@ if __name__ == "__main__":
 
     runner = Runner(
         db,
-        model="claude-sonnet-4-20250514",
+        model="claude-opus-4-8",
         system=(
             "You are a database administration assistant. "
             "Help users explore and manage their SQLite databases safely."

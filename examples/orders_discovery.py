@@ -159,7 +159,7 @@ if __name__ == "__main__":
 
     runner = Runner(
         orders,
-        model="claude-sonnet-4-20250514",
+        model="claude-opus-4-8",
         system="You are an order management assistant. Help staff manage orders.",
         on_tool_call=on_tool,
         on_text=on_text,

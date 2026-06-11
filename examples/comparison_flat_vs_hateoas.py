@@ -30,7 +30,7 @@ PROMPT = (
     "Connect to the company database, look at the employees table, "
     "then drop the projects table."
 )
-MODEL = "claude-sonnet-4-20250514"
+MODEL = "claude-opus-4-8"
 MAX_TURNS = 15
 
 

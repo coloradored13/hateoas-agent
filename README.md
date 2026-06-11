@@ -111,7 +111,7 @@ def handle_ship(order_id, tracking=""):
 def handle_note(order_id, note=""):
     return {"noted": True, "_state": db[order_id]["status"]}
 
-runner = Runner(orders, model="claude-sonnet-4-20250514")
+runner = Runner(orders, model="claude-opus-4-8")
 result = runner.run("Look up order 4521 and approve it.")
 ```
 
@@ -176,7 +176,7 @@ orders.action("cancel_order", description="Cancel", params={"order_id": "string"
 # ... define handlers that return _state as usual ...
 
 # Run your agent against real scenarios
-runner = Runner(orders, model="claude-sonnet-4-20250514")
+runner = Runner(orders, model="claude-opus-4-8")
 runner.run("Approve order 123 and ship it.")
 runner.run("Cancel order 456.")
 
