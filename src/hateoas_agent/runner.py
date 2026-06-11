@@ -32,7 +32,7 @@ class Runner:
 
     Usage::
 
-        runner = Runner(state_machine, model="claude-sonnet-4-20250514")
+        runner = Runner(state_machine, model="claude-opus-4-8")
         result = runner.run("Look up order 4521 and approve it.")
 
     Security callbacks::
@@ -49,7 +49,7 @@ class Runner:
         self,
         resource: Any,
         *,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = "claude-opus-4-8",
         system: Optional[str] = None,
         max_turns: int = 10,
         max_tokens: int = 1024,

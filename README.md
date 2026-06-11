@@ -1,5 +1,10 @@
 # hateoas-agent
 
+[![CI](https://github.com/coloradored13/hateoas-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/coloradored13/hateoas-agent/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/hateoas-agent)](https://pypi.org/project/hateoas-agent/)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://github.com/coloradored13/hateoas-agent/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
+
 **Dynamic tool discovery for AI agents. Start with one tool. Let the API tell your agent what to do next.**
 
 Other frameworks give your LLM a flat list of tools and hope it picks the right one. With 10 tools, that works. With 50, accuracy drops. With 100+, your agent hallucinates tool names, calls things out of order, and you're left writing defensive prompts begging it to behave.
@@ -31,10 +36,18 @@ hateoas-agent applies the same principle that makes the web work — [HATEOAS](h
 ## Install
 
 ```bash
-pip install git+https://github.com/coloradored13/hateoas-agent.git                  # core library (no LLM dependency)
-pip install 'hateoas-agent[anthropic]'     # with Claude Runner support (after installing core)
-pip install 'hateoas-agent[mcp]'           # with MCP server support (after installing core)
+pip install hateoas-agent                  # core library (zero runtime dependencies)
+pip install 'hateoas-agent[anthropic]'     # with Claude Runner support
+pip install 'hateoas-agent[mcp]'           # with MCP server support
 ```
+
+Or install the latest development version from source:
+
+```bash
+pip install git+https://github.com/coloradored13/hateoas-agent.git
+```
+
+To use the `Runner`, set your API key: `export ANTHROPIC_API_KEY=sk-...`
 
 ## Quick start
 
@@ -111,7 +124,7 @@ def handle_ship(order_id, tracking=""):
 def handle_note(order_id, note=""):
     return {"noted": True, "_state": db[order_id]["status"]}
 
-runner = Runner(orders, model="claude-sonnet-4-20250514")
+runner = Runner(orders, model="claude-opus-4-8")
 result = runner.run("Look up order 4521 and approve it.")
 ```
 
@@ -176,7 +189,7 @@ orders.action("cancel_order", description="Cancel", params={"order_id": "string"
 # ... define handlers that return _state as usual ...
 
 # Run your agent against real scenarios
-runner = Runner(orders, model="claude-sonnet-4-20250514")
+runner = Runner(orders, model="claude-opus-4-8")
 runner.run("Approve order 123 and ship it.")
 runner.run("Cancel order 456.")
 

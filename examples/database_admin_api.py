@@ -298,7 +298,7 @@ def create_session():
     tool_log = []
     runner = Runner(
         sm,
-        model="claude-sonnet-4-20250514",
+        model="claude-opus-4-8",
         system="You are a database admin assistant. Help users explore and manage SQLite databases safely.",
         on_tool_call=lambda name, inp: tool_log.append({"tool": name, "input": inp}),
     )
