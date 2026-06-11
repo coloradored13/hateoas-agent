@@ -121,7 +121,7 @@ class TestRead297ApiErrorPreservesState:
         return sm
 
     def test_api_failure_raises_runner_api_error_with_state(self):
-        import anthropic
+        anthropic = pytest.importorskip("anthropic")
 
         class _Boom(anthropic.APIError):
             def __init__(self):
@@ -142,7 +142,7 @@ class TestRead297ApiErrorPreservesState:
 
     def test_recovery_after_transient_failure(self):
         """A failure on turn 1 can be resumed; the second run completes."""
-        import anthropic
+        anthropic = pytest.importorskip("anthropic")
 
         class _Boom(anthropic.APIError):
             def __init__(self):
