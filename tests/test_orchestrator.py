@@ -3,8 +3,6 @@
 Phase 1: sequential execution only (no async).
 """
 
-import json
-
 import pytest
 
 from hateoas_agent.agent_slot import AgentSlot, AgentStatus
@@ -570,17 +568,17 @@ class TestHateoasProtocol:
         assert actions == []
 
     def test_get_handler_transition(self, simple_orchestrator):
-        handler = simple_orchestrator.get_handler("research_to_synthesis")
+        handler = simple_orchestrator._get_handler("research_to_synthesis")
         assert handler is not None
         assert callable(handler)
 
     def test_get_handler_advance(self, simple_orchestrator):
-        handler = simple_orchestrator.get_handler("advance")
+        handler = simple_orchestrator._get_handler("advance")
         assert handler is not None
         assert callable(handler)
 
     def test_get_handler_unknown(self, simple_orchestrator):
-        handler = simple_orchestrator.get_handler("nonexistent")
+        handler = simple_orchestrator._get_handler("nonexistent")
         assert handler is None
 
     def test_get_all_action_names(self, simple_orchestrator):
@@ -660,11 +658,13 @@ class TestRegistryIntegration:
         before guard evaluation.
         """
         reg = Registry(guarded_orchestrator)
-        reg.handle_tool_call(
-            "start_workflow",
-            {"context": json.dumps({"converged": True})},
-        )
-        # Now in challenge via guard. Set exit_gate programmatically, then advance
+        reg.handle_tool_call("start_workflow", {})
+        # The hardened gateway does NOT accept guard-controlling context from
+        # tool input, so set it server-side, then advance research -> challenge.
+        guarded_orchestrator._context["converged"] = True
+        reg.handle_tool_call("advance", {})
+        assert reg._last_state == "challenge"
+        # Now in challenge. Set exit_gate programmatically, then advance
         guarded_orchestrator._context["exit_gate"] = "FAIL"
         reg.handle_tool_call("advance", {})
         assert reg._last_state == "challenge"

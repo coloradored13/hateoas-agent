@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import logging
+import os
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+from .invocation import GatedInvokeMixin
 from .types import ActionDef, GatewayDef, StateDef
 from .validation import validate_required_params
 
 logger = logging.getLogger(__name__)
 
 
-class StateMachine:
+class StateMachine(GatedInvokeMixin):
     """Declarative API for defining a HATEOAS resource.
 
     Supports two styles for defining actions:
@@ -36,10 +38,26 @@ class StateMachine:
     available in every state and transitions are logged for later analysis.
     """
 
-    def __init__(self, name: str, gateway_name: str = "gateway", *, mode: str = "strict"):
+    def __init__(
+        self,
+        name: str,
+        gateway_name: str = "gateway",
+        *,
+        mode: str = "strict",
+        allow_discover: bool = False,
+    ):
         if mode not in ("strict", "discover"):
             raise ValueError(f"mode must be 'strict' or 'discover', got {mode!r}")
         if mode == "discover":
+            # Discover mode disables state gating entirely (all actions in all
+            # states). Require an explicit opt-in so it can't ship by accident.
+            if not (allow_discover or os.environ.get("HATEOAS_ALLOW_DISCOVER") == "1"):
+                raise ValueError(
+                    f"StateMachine '{name}': mode='discover' disables state gating "
+                    f"(ALL actions available in ALL states). If this is intentional, "
+                    f"pass allow_discover=True or set HATEOAS_ALLOW_DISCOVER=1. "
+                    f"Never use discover mode in production."
+                )
             logger.warning(
                 "StateMachine '%s' is in discover mode — ALL actions are available "
                 "in ALL states. Do not use in production.",
@@ -123,6 +141,7 @@ class StateMachine:
         params: Optional[Dict[str, str]] = None,
         required: Optional[List[str]] = None,
         guard: Optional[Callable] = None,
+        preserves_state: bool = False,
     ) -> None:
         """Define an action with state transition metadata (action-centric style).
 
@@ -140,12 +159,17 @@ class StateMachine:
                 Returns ``True`` to include the action, ``False`` to exclude.
                 If the guard raises an exception, the action is excluded
                 (fail-closed).
+            preserves_state: If True, the Registry ignores any ``_state`` this
+                action's handler returns and keeps the current state. Use for
+                read-only / universal actions so a stray ``_state`` can't
+                silently re-gate the session.
         """
         action_def = ActionDef(
             name=name,
             description=description,
             params=params or {},
             required=required or [],
+            preserves_state=preserves_state,
         )
 
         # Resolve from_states
@@ -262,6 +286,7 @@ class StateMachine:
                         params=action_def.params,
                         required=action_def.required,
                         handler=self._action_handlers.get(action_name),
+                        preserves_state=action_def.preserves_state,
                     )
                 )
                 seen_names.add(action_name)
@@ -278,14 +303,19 @@ class StateMachine:
                             params=ad.params,
                             required=ad.required,
                             handler=self._action_handlers.get(ad.name),
+                            preserves_state=ad.preserves_state,
                         )
                     )
                     seen_names.add(ad.name)
 
         return result
 
-    def get_handler(self, action_name: str) -> Optional[Callable]:
-        """Return the handler for a given action name."""
+    def _get_handler(self, action_name: str) -> Optional[Callable]:
+        """Return the raw handler for an action name (Registry-internal).
+
+        Private: invoking a handler directly bypasses the state gate. Use
+        ``Registry.handle_tool_call`` or the gated ``invoke()`` instead.
+        """
         return self._action_handlers.get(action_name)
 
     def get_all_action_names(self) -> set[str]:
@@ -295,6 +325,23 @@ class StateMachine:
             for action_def in state_def.actions:
                 names.add(action_def.name)
         return names
+
+    def get_known_states(self) -> set[str]:
+        """Return every state name this machine references.
+
+        Union of ``.state()`` names, all action ``from_states`` (excluding the
+        ``"*"`` wildcard), and all declared ``to_state`` targets. The Registry
+        uses this to fail-close a handler that returns a ``_state`` outside the
+        machine's vocabulary (state teleport). An empty set means "unconstrained".
+        """
+        states: set[str] = set(self._states.keys())
+        for from_states in self._action_from_states.values():
+            if isinstance(from_states, list):
+                states.update(from_states)
+        for to_state in self._action_to_states.values():
+            if to_state is not None:
+                states.add(to_state)
+        return states
 
     def get_transition_metadata(
         self, action_name: str

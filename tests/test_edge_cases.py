@@ -62,14 +62,14 @@ class TestStateMachineEdgeCases:
         )
 
         # Handler should still be accessible
-        handler = sm.get_handler("do_thing")
+        handler = sm._get_handler("do_thing")
         assert handler is not None
         result = handler()
         assert result["done"] is True
 
     def test_get_handler_for_unregistered_action(self):
         sm = StateMachine("test")
-        assert sm.get_handler("nonexistent") is None
+        assert sm._get_handler("nonexistent") is None
 
     def test_empty_string_state_name(self):
         """Empty string state name works like any other state."""
@@ -206,7 +206,7 @@ class TestResourceEdgeCases:
                 return {}
 
         r = SimpleResource()
-        assert r.get_handler("nonexistent") is None
+        assert r._get_handler("nonexistent") is None
 
 
 class TestRegistryEdgeCases:

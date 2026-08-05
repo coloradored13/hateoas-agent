@@ -10,7 +10,7 @@ class TestDiscoveryModeStateMachine:
     """Tests for StateMachine in discover mode."""
 
     def test_all_actions_available_in_any_state(self):
-        sm = StateMachine("test", gateway_name="gw", mode="discover")
+        sm = StateMachine("test", gateway_name="gw", mode="discover", allow_discover=True)
         sm.gateway(description="GW", params={})
         sm.action("approve", description="Approve", params={"id": "string"})
         sm.action("ship", description="Ship", params={"id": "string"})
@@ -21,13 +21,13 @@ class TestDiscoveryModeStateMachine:
             assert names == {"approve", "ship"}
 
     def test_from_states_optional_in_discover_mode(self):
-        sm = StateMachine("test", gateway_name="gw", mode="discover")
+        sm = StateMachine("test", gateway_name="gw", mode="discover", allow_discover=True)
         # Should not raise — from_states defaults to "*"
         sm.action("approve", description="Approve", params={})
         assert sm.get_transition_metadata("approve") == ("*", None)
 
     def test_from_states_still_accepted_in_discover_mode(self):
-        sm = StateMachine("test", gateway_name="gw", mode="discover")
+        sm = StateMachine("test", gateway_name="gw", mode="discover", allow_discover=True)
         sm.action(
             "approve",
             description="Approve",
@@ -39,7 +39,7 @@ class TestDiscoveryModeStateMachine:
         assert len(sm.get_actions_for_state("shipped")) == 1
 
     def test_mixed_state_and_action_in_discover(self):
-        sm = StateMachine("test", gateway_name="gw", mode="discover")
+        sm = StateMachine("test", gateway_name="gw", mode="discover", allow_discover=True)
         sm.gateway(description="GW", params={})
         sm.state(
             "pending",
@@ -63,8 +63,8 @@ class TestDiscoveryModeStateMachine:
 class TestTransitionLogging:
     """Tests for Registry transition logging."""
 
-    def _make_sm(self, mode="strict"):
-        sm = StateMachine("test", gateway_name="gw", mode=mode)
+    def _make_sm(self, mode="strict", allow_discover=False):
+        sm = StateMachine("test", gateway_name="gw", mode=mode, allow_discover=allow_discover)
         sm.gateway(description="GW", params={"id": "string"})
         sm.action(
             "approve",
@@ -162,7 +162,7 @@ class TestTransitionLogging:
         assert report.transitions[0].state_after == "pending"
 
     def test_discover_mode_full_flow(self):
-        sm = self._make_sm(mode="discover")
+        sm = self._make_sm(mode="discover", allow_discover=True)
         reg = Registry(sm)
 
         reg.handle_tool_call("gw", {"id": "1"})
@@ -286,7 +286,9 @@ class TestToStateWarning:
             # Returns different state than declared to_state
             return {"_state": "rejected"}
 
-        reg = Registry(sm)
+        # strict_transitions defaults to True (v0.3) which would RAISE on the
+        # mismatch; this test pins the opt-out legacy warn-and-apply behavior.
+        reg = Registry(sm, strict_transitions=False)
         reg.handle_tool_call("gw", {})
 
         with caplog.at_level(logging.WARNING, logger="hateoas_agent.registry"):

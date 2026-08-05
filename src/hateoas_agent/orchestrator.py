@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .agent_slot import AgentResult, AgentSlot, AgentStatus
+from .invocation import GatedInvokeMixin
 from .types import ActionDef, GatewayDef
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ class PhaseResult:
     agent_results: List[AgentResult] = field(default_factory=list)
 
 
-class Orchestrator:
+class Orchestrator(GatedInvokeMixin):
     """Multi-agent workflow orchestrator implementing HasHateoas.
 
     Phases are states, transitions are guarded by conditions. Because it
@@ -110,9 +111,17 @@ class Orchestrator:
         *,
         agents: Optional[List[AgentSlot]] = None,
         gateway_name: str = "start_workflow",
+        start_phase: Optional[str] = None,
+        allow_phase_targets: Optional[List[str]] = None,
     ):
         self.name = name
         self._gateway_name = gateway_name
+        # Gateway lock-down: the LLM-facing gateway may only start the workflow
+        # at an allowed phase. By default that is the single start_phase (or the
+        # first defined phase). allow_phase_targets widens it explicitly for
+        # advanced use. An LLM cannot pick an arbitrary phase to teleport into.
+        self._start_phase = start_phase
+        self._allow_phase_targets = set(allow_phase_targets) if allow_phase_targets else None
 
         # Agent registry
         self._agents: Dict[str, AgentSlot] = {}
@@ -463,12 +472,20 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def get_gateway(self) -> Optional[GatewayDef]:
-        """Return a gateway tool that starts the orchestrator workflow."""
+        """Return a gateway tool that starts the orchestrator workflow.
+
+        Hardened (v0.3): the gateway takes **no** LLM-supplied ``phase`` or
+        ``context``. It always starts at the configured ``start_phase`` (or the
+        first defined phase). This closes the phase-teleport hole where a model
+        could jump straight into a terminal phase, and the context-injection
+        hole where a model could pre-seed values a later transition guard reads.
+        Developers set the starting phase/context via ``start()`` / ``AsyncRunner``
+        (trusted APIs), not through the agent-facing gateway.
+        """
 
         def handler(**kwargs: Any) -> Dict[str, Any]:
-            phase = kwargs.get("phase") or self._first_phase
-            ctx = self._parse_tool_context(kwargs.get("context"))
-            state = self.start(phase, context=ctx)
+            phase = self._resolve_gateway_start_phase(kwargs.get("phase"))
+            state = self.start(phase, context=None)
             return {
                 "phase": state.current_phase,
                 "context": state.context,
@@ -476,12 +493,28 @@ class Orchestrator:
                 "_state": state.current_phase,
             }
 
+        # A ``phase`` param is exposed ONLY when the developer explicitly
+        # allowlisted targets — and even then it is validated against that set.
+        params = {"phase": "string"} if self._allow_phase_targets else {}
         return GatewayDef(
             name=self._gateway_name,
             description=f"Start the {self.name} workflow",
-            params={"phase": "string", "context": "string"},
+            params=params,
             handler=handler,
         )
+
+    def _resolve_gateway_start_phase(self, requested: Optional[str] = None) -> Optional[str]:
+        """The phase the agent-facing gateway is allowed to start at.
+
+        Without an explicit ``allow_phase_targets`` allowlist, any LLM-requested
+        phase is ignored and the workflow starts at ``start_phase`` (or the first
+        phase). With an allowlist, a requested phase is honored only if it is in
+        the set; anything else falls back to the default start phase.
+        """
+        default = self._start_phase or self._first_phase
+        if self._allow_phase_targets and requested in self._allow_phase_targets:
+            return requested
+        return default
 
     def get_actions_for_state(self, state: str) -> List[ActionDef]:
         """Return available transitions from a phase as HATEOAS actions."""
@@ -511,8 +544,12 @@ class Orchestrator:
 
         return actions
 
-    def get_handler(self, action_name: str) -> Optional[Callable]:
-        """Return handler for a transition action name."""
+    def _get_handler(self, action_name: str) -> Optional[Callable]:
+        """Return the transition handler for an action name (Registry-internal).
+
+        Private: invoking a handler directly bypasses the guard/state gate. Use
+        ``Registry.handle_tool_call`` or the gated ``invoke()`` instead.
+        """
         if action_name == "advance":
             return self._make_advance_handler()
         for trans in self._transitions:
@@ -526,6 +563,10 @@ class Orchestrator:
         if self._transitions:
             names.add("advance")
         return names
+
+    def get_known_states(self) -> set[str]:
+        """Return every phase name — the orchestrator's known states."""
+        return set(self._phases.keys())
 
     def validate(self) -> None:
         """Validate orchestrator configuration.

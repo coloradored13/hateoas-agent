@@ -34,7 +34,7 @@ def test_all_action_names(order_machine):
 
 
 def test_handlers_attached(order_machine):
-    handler = order_machine.get_handler("approve_order")
+    handler = order_machine._get_handler("approve_order")
     assert handler is not None
     result = handler(order_id="100")
     assert result["success"] is True

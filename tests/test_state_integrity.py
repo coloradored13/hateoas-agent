@@ -12,8 +12,9 @@ Three properties:
    ``_state``, the LLM controls state. [author footgun — documented, not a
    framework bug; this test pins the behavior so it can't change silently]
 3. A handler that returns a ``_state`` other than its declared ``to_state`` is,
-   by default, accepted with a warning; with ``strict_transitions=True`` it is
-   rejected with ``StateTransitionError`` and the bad state is not committed.
+   by default (``strict_transitions=True`` as of v0.3), rejected with
+   ``StateTransitionError`` and the bad state is not committed; with
+   ``strict_transitions=False`` it is accepted with a warning (legacy opt-out).
 """
 
 import logging
@@ -179,13 +180,23 @@ class TestToStateEnforcement:
 
         return sm
 
-    def test_default_warns_and_applies_mismatched_state(self, caplog):
+    def test_default_rejects_mismatched_state(self):
+        # v0.3: strict_transitions defaults to True, so a mismatch is rejected
+        # and the bad state is never committed.
         sm = self._machine()
         reg = Registry(sm)
         reg.handle_tool_call("query", {"order_id": "1"})
+        with pytest.raises(StateTransitionError):
+            reg.handle_tool_call("approve", {"order_id": "1"})
+        assert reg._last_state == "pending"
+
+    def test_nonstrict_warns_and_applies_mismatched_state(self, caplog):
+        sm = self._machine()
+        reg = Registry(sm, strict_transitions=False)
+        reg.handle_tool_call("query", {"order_id": "1"})
         with caplog.at_level(logging.WARNING, logger="hateoas_agent"):
             reg.handle_tool_call("approve", {"order_id": "1"})
-        # Back-compatible behavior: mismatch applied, but loudly logged.
+        # Legacy opt-out behavior: mismatch applied, but loudly logged.
         assert reg._last_state == "shipped"
         assert any("to_state" in r.message for r in caplog.records)
 

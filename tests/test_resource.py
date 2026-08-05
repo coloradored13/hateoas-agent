@@ -36,7 +36,7 @@ def test_all_action_names(order_resource):
 
 
 def test_handler_execution(order_resource):
-    handler = order_resource.get_handler("approve_order")
+    handler = order_resource._get_handler("approve_order")
     assert handler is not None
     result = handler(order_id="100")
     assert result["success"] is True

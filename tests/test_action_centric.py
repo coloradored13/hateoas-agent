@@ -252,7 +252,7 @@ class TestHandlerAttachment:
         def handle(**kw):
             return {"done": True}
 
-        assert sm.get_handler("approve") is handle
+        assert sm._get_handler("approve") is handle
 
 
 class TestGetAllActionNames:
@@ -297,7 +297,7 @@ class TestModeProperty:
         assert sm.mode == "strict"
 
     def test_discover_mode(self):
-        sm = StateMachine("test", gateway_name="gw", mode="discover")
+        sm = StateMachine("test", gateway_name="gw", mode="discover", allow_discover=True)
         assert sm.mode == "discover"
 
 

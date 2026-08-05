@@ -37,7 +37,12 @@ All three plug into `Registry` (tool routing), `Runner` (Claude API loop), MCP s
 - Agents are `AgentSlot` dataclasses, NOT their own state machines
 - Self-loop transitions (e.g., challenge → challenge) work through Registry
 - Guards are `Callable[[dict], bool]` — use `conditions.py` factories or plain lambdas
-- Zero breaking changes from v0.1
+- v0.1 → v0.2 was zero breaking changes. **v0.3 is a deliberate security break**
+  (see CHANGELOG "Gating hardening"): `get_handler` → `_get_handler` (use gated
+  `invoke()`), `strict_transitions` defaults to `True`, the `Orchestrator` gateway
+  no longer takes LLM-supplied `phase`/`context`, and `discover` mode needs an
+  explicit opt-in. The single gated invoke path is `Registry.handle_tool_call` /
+  `resource.invoke()`.
 
 ## Testing
 

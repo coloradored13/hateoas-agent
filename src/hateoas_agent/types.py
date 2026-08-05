@@ -16,6 +16,11 @@ class ActionDef:
     params: Dict[str, str] = field(default_factory=dict)
     required: List[str] = field(default_factory=list)
     handler: Optional[Callable] = field(default=None, repr=False)
+    # When True, the Registry ignores any ``_state`` this action's handler
+    # returns and keeps the current state. Use for read-only / universal
+    # actions so a stray ``_state`` in the return can't silently re-gate the
+    # session (see the sigma-mem ``f89aaf6`` state-flip bug).
+    preserves_state: bool = False
 
 
 @dataclass
@@ -35,6 +40,7 @@ class GatewayDef:
     params: Dict[str, str] = field(default_factory=dict)
     required: List[str] = field(default_factory=list)
     handler: Optional[Callable] = field(default=None, repr=False)
+    preserves_state: bool = False
 
 
 @dataclass
