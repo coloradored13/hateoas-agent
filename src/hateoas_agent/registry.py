@@ -24,17 +24,25 @@ class HasHateoas(Protocol):
     """Protocol for objects that provide HATEOAS definitions (StateMachine or Resource).
 
     Required methods:
-        get_gateway, get_actions_for_state, get_handler, get_all_action_names
+        get_gateway, get_actions_for_state, _get_handler, get_all_action_names
+
+    ``_get_handler`` is intentionally private: it returns a raw handler
+    callable that, if invoked directly, bypasses the state gate entirely. Only
+    the Registry (the gating layer) should call it. Application code must go
+    through ``Registry.handle_tool_call`` or the resource's gated ``invoke()``.
 
     Optional methods (checked via hasattr at runtime):
         validate — startup configuration check
         filter_actions — guard-based action filtering
         get_transition_metadata — declared from/to states for an action
+        get_known_states — the set of states the resource recognizes; when
+            provided, the Registry refuses to commit a handler-returned
+            ``_state`` outside this set (fail-closed against state teleport).
     """
 
     def get_gateway(self) -> Optional[GatewayDef]: ...
     def get_actions_for_state(self, state: str) -> List[ActionDef]: ...
-    def get_handler(self, action_name: str) -> Optional[Any]: ...
+    def _get_handler(self, action_name: str) -> Optional[Any]: ...
     def get_all_action_names(self) -> set[str]: ...
 
     # Optional extension points — implementations may omit these.
@@ -46,6 +54,7 @@ class HasHateoas(Protocol):
     def get_transition_metadata(
         self, action_name: str
     ) -> Optional[Tuple[Union[List[str], str], Optional[str]]]: ...
+    def get_known_states(self) -> Optional[set[str]]: ...
 
 
 # Sentinel for "no state returned"
@@ -139,15 +148,29 @@ class Registry:
     transitions, and formats results with action advertisements.
     """
 
-    def __init__(self, resource: HasHateoas, *, strict_transitions: bool = False):
+    def __init__(
+        self,
+        resource: HasHateoas,
+        *,
+        strict_transitions: bool = True,
+        enforce_known_states: bool = False,
+    ):
         self._resource = resource
         self._last_state: Optional[str] = None
         self._last_result: Dict[str, Any] = {}
         self._transition_log: List[TransitionRecord] = []
-        # When True, a handler that returns a _state other than its action's
-        # declared to_state raises StateTransitionError (and the bad state is
-        # not committed). When False (default), the mismatch is only logged.
+        # strict_transitions (default True as of v0.3): a handler that returns a
+        # _state other than its action's *declared* to_state raises
+        # StateTransitionError and the bad state is NOT committed. When False,
+        # the mismatch is only logged and applied (pre-0.3 fail-open behavior).
         self._strict_transitions = strict_transitions
+        # enforce_known_states (opt-in, stricter): additionally reject a
+        # returned _state that is not in the resource's declared vocabulary
+        # (get_known_states). Off by default because a legitimate action may
+        # introduce its next state purely via the handler's _state return
+        # without declaring a to_state. Turn on for maximum-strictness gates
+        # where every state is declared up front.
+        self._enforce_known_states = enforce_known_states
 
     @property
     def gateway_name(self) -> str:
@@ -226,6 +249,63 @@ class Registry:
         else:
             return self._handle_action(tool_name, tool_input)
 
+    def _known_states(self) -> Optional[set[str]]:
+        """Return the resource's known-state set, or None if it declares none.
+
+        None means "no constraint" — the resource does not enumerate its
+        states, so the Registry can't fail-close a returned state against them.
+        """
+        getter = getattr(self._resource, "get_known_states", None)
+        if getter is None:
+            return None
+        try:
+            states = getter()
+        except Exception:  # pragma: no cover - defensive
+            logger.warning("get_known_states() raised; skipping known-state check", exc_info=True)
+            return None
+        return set(states) if states else None
+
+    def _reconcile_returned_state(self, tool_name: str, state: str) -> None:
+        """Validate a handler-returned ``_state`` before it is committed.
+
+        Under ``strict_transitions`` (the v0.3 default) a state that violates
+        the action's declared ``to_state`` — or that is not one of the
+        resource's known states — raises ``StateTransitionError`` so the bad
+        state is never committed. Otherwise the mismatch is only logged and the
+        caller applies it (pre-0.3 fail-open behavior).
+        """
+        # 1. Declared to_state reconciliation.
+        if hasattr(self._resource, "get_transition_metadata"):
+            meta = self._resource.get_transition_metadata(tool_name)
+            if meta is not None:
+                _, declared_to = meta
+                if declared_to is not None and state != declared_to:
+                    if self._strict_transitions:
+                        raise StateTransitionError(tool_name, declared_to, state)
+                    logger.warning(
+                        "Action '%s' declared to_state='%s' but handler returned _state='%s'",
+                        tool_name,
+                        declared_to,
+                        state,
+                    )
+                    return
+        # 2. Known-state membership — catches teleport to an undeclared state
+        #    even when the action declared no to_state. Opt-in only, since a
+        #    legitimate action may introduce its next state via the handler
+        #    return without declaring it.
+        if not self._enforce_known_states:
+            return
+        known = self._known_states()
+        if known is not None and state not in known:
+            if self._strict_transitions:
+                raise StateTransitionError(tool_name, f"one of {sorted(known)}", state)
+            logger.warning(
+                "Action '%s' handler returned _state=%r which is not a known state (%s)",
+                tool_name,
+                state,
+                sorted(known),
+            )
+
     def _handle_gateway(self, tool_input: Dict[str, Any]) -> str:
         gw = self._resource.get_gateway()
         if not gw or not gw.handler:
@@ -274,7 +354,7 @@ class Registry:
         available = self._get_filtered_actions(self._last_state)
         validate_action(tool_name, self._last_state, available)
 
-        handler = self._resource.get_handler(tool_name)
+        handler = self._resource._get_handler(tool_name)
         if not handler:
             raise NoHandlerError(tool_name)
 
@@ -293,26 +373,26 @@ class Registry:
         raw_result = handler(**filtered)
         result, state = _extract_state(raw_result)
 
-        # Reconcile the returned state against the action's declared to_state
-        # BEFORE committing it, so strict mode can reject without ever landing
-        # in the unexpected state.
-        if state is not _NO_STATE and hasattr(self._resource, "get_transition_metadata"):
-            meta = self._resource.get_transition_metadata(tool_name)
-            if meta is not None:
-                _, declared_to = meta
-                if declared_to is not None and state != declared_to:
-                    if self._strict_transitions:
-                        raise StateTransitionError(tool_name, declared_to, state)
-                    logger.warning(
-                        "Action '%s' declared to_state='%s' but handler returned _state='%s'",
-                        tool_name,
-                        declared_to,
-                        state,
-                    )
+        # A read-only / universal action must not move the gate. If it is
+        # declared preserves_state, drop any _state it returned so a stray
+        # value can't silently re-gate the session (sigma-mem f89aaf6).
+        preserves = bool(action_def and action_def.preserves_state)
+        if preserves and state is not _NO_STATE:
+            logger.debug(
+                "Action '%s' is preserves_state; ignoring returned _state=%r",
+                tool_name,
+                state,
+            )
+            state = _NO_STATE
+
+        # Reconcile the returned state BEFORE committing it, so strict mode can
+        # reject without ever landing in the unexpected state.
+        if state is not _NO_STATE:
+            self._reconcile_returned_state(tool_name, state)
 
         if state is not _NO_STATE:
             self._last_state = state
-        elif isinstance(result, dict):
+        elif isinstance(result, dict) and not preserves:
             logger.warning(
                 "Action '%s' handler returned a dict without '_state'. "
                 "State will remain '%s'. Add '_state' to your return value.",

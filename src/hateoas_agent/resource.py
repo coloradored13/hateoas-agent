@@ -7,6 +7,7 @@ import logging
 from dataclasses import replace
 from typing import Any, Callable, Dict, List, Optional
 
+from .invocation import GatedInvokeMixin
 from .types import ActionDef, GatewayDef
 from .validation import validate_required_params
 
@@ -47,12 +48,16 @@ def action(
     params: Optional[Dict[str, str]] = None,
     required: Optional[List[str]] = None,
     guard: Optional[Callable] = None,
+    preserves_state: bool = False,
 ) -> Callable:
     """Decorator to mark a method as a dynamic action handler.
 
     Args:
         guard: Optional callable receiving the last handler result dict.
             Returns ``True`` to include the action, ``False`` to exclude.
+        preserves_state: If True, the Registry ignores any ``_state`` this
+            handler returns and keeps the current state. Use for read-only /
+            universal actions so a stray ``_state`` can't silently re-gate.
     """
 
     def decorator(fn: Callable) -> Callable:
@@ -61,6 +66,7 @@ def action(
             description=description,
             params=params or {},
             required=required or [],
+            preserves_state=preserves_state,
         )
         if guard is not None:
             fn._hateoas_guard = guard
@@ -99,7 +105,7 @@ def state(*states: str) -> Callable:
     return decorator
 
 
-class Resource:
+class Resource(GatedInvokeMixin):
     """Base class for handler-based HATEOAS resources.
 
     Usage::
@@ -174,11 +180,17 @@ class Resource:
                     params=action_def.params,
                     required=action_def.required,
                     handler=method,
+                    preserves_state=action_def.preserves_state,
                 )
                 actions.append(ad)
         return actions
 
-    def get_handler(self, action_name: str) -> Optional[Callable]:
+    def _get_handler(self, action_name: str) -> Optional[Callable]:
+        """Return the raw handler for an action name (Registry-internal).
+
+        Private: invoking a handler directly bypasses the state gate. Use
+        ``Registry.handle_tool_call`` or the gated ``invoke()`` instead.
+        """
         method_name = self._action_methods.get(action_name)
         if not method_name:
             return None
@@ -186,6 +198,18 @@ class Resource:
 
     def get_all_action_names(self) -> set[str]:
         return set(self._action_methods.keys())
+
+    def get_known_states(self) -> set[str]:
+        """Return every state referenced by an ``@state(...)`` decorator.
+
+        Union of all per-action declared states. Empty when no action
+        restricts its states (fully universal resource) — treated as
+        "unconstrained" by the Registry's known-state check.
+        """
+        states: set[str] = set()
+        for state_list in self._action_states.values():
+            states.update(state_list)
+        return states
 
     def validate(self) -> None:
         """Check that the resource is minimally configured for use.

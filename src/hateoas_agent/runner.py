@@ -62,7 +62,8 @@ class Runner:
         on_phantom_tool: Optional[Callable] = None,
         on_transition: Optional[Callable] = None,
         strict: bool = False,
-        strict_transitions: bool = False,
+        strict_transitions: bool = True,
+        enforce_known_states: bool = False,
     ):
         # Support list of resources (multi-resource composition)
         if isinstance(resource, list):
@@ -71,11 +72,19 @@ class Runner:
             for r in resource:
                 if hasattr(r, "validate"):
                     r.validate()
-            self._registry = CompositeRegistry(resource, strict_transitions=strict_transitions)
+            self._registry = CompositeRegistry(
+                resource,
+                strict_transitions=strict_transitions,
+                enforce_known_states=enforce_known_states,
+            )
         else:
             if hasattr(resource, "validate"):
                 resource.validate()
-            self._registry = Registry(resource, strict_transitions=strict_transitions)
+            self._registry = Registry(
+                resource,
+                strict_transitions=strict_transitions,
+                enforce_known_states=enforce_known_states,
+            )
         self._model = model
         self._system = system or self._default_system()
         self._max_turns = max_turns
@@ -231,6 +240,11 @@ class Runner:
                     current_state = self._registry._last_state
                     if self._on_invalid_action:
                         self._on_invalid_action(tu.name, tu.input, current_state)
+                    if self._strict:
+                        # Strict parity with phantom tools: a known action called
+                        # in the wrong state is a gate violation, so halt rather
+                        # than returning a soft, recoverable error.
+                        raise
                     tool_results.append(
                         {
                             "type": "tool_result",

@@ -28,7 +28,7 @@ from hateoas_agent.registry import _normalize_param_type
 
 class TestDiscoverModeRepeatedWarning:
     def test_action_in_discover_mode_warns(self, caplog):
-        sm = StateMachine("t", gateway_name="gw", mode="discover")
+        sm = StateMachine("t", gateway_name="gw", mode="discover", allow_discover=True)
         with caplog.at_level(logging.WARNING, logger="hateoas_agent.state_machine"):
             sm.action("approve", description="A", params={})
         assert any("discover mode" in r.message and "approve" in r.message for r in caplog.records)
@@ -40,7 +40,7 @@ class TestDiscoverModeRepeatedWarning:
         assert not any("discover mode" in r.message for r in caplog.records)
 
     def test_state_in_discover_mode_warns(self, caplog):
-        sm = StateMachine("t", gateway_name="gw", mode="discover")
+        sm = StateMachine("t", gateway_name="gw", mode="discover", allow_discover=True)
         with caplog.at_level(logging.WARNING, logger="hateoas_agent.state_machine"):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", DeprecationWarning)

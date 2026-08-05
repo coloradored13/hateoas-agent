@@ -5,6 +5,56 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — Gating hardening
+
+This release closes several ways an agent (or an integrator) could reach an
+action the current state should forbid. Some changes are **breaking** — the gate
+is now safe-by-default. See "Breaking changes" below for migration.
+
+### Breaking changes
+- **`get_handler` is now private (`_get_handler`).** A public `get_handler` on
+  `StateMachine`/`Resource`/`Orchestrator` returned a raw handler callable that,
+  invoked directly, skipped the Registry's state gate entirely — the first
+  integrator reached for it and silently lost enforcement. Application code must
+  now go through `Registry.handle_tool_call` or the new gated `invoke()`.
+- **`strict_transitions` now defaults to `True`** on `Registry`, `Runner`, and
+  `CompositeRegistry`. A handler that returns a `_state` other than its action's
+  declared `to_state` now raises `StateTransitionError` and the bad state is not
+  committed. Pass `strict_transitions=False` for the old warn-and-apply behavior.
+- **The `Orchestrator` gateway no longer accepts LLM-supplied `phase` or
+  `context`.** Previously an agent could call the start gateway with
+  `phase="synthesis"` to teleport past guarded transitions, and inject `context`
+  that a later transition guard reads. The gateway now always starts at
+  `start_phase` (or the first phase). Set the starting phase/context via the
+  trusted `start()` / `AsyncRunner` APIs. An explicit `allow_phase_targets`
+  allowlist re-enables a validated `phase` param for advanced use.
+- **`mode="discover"` now requires an explicit opt-in** (`allow_discover=True`
+  or `HATEOAS_ALLOW_DISCOVER=1`), because discover mode disables state gating
+  entirely (all actions in all states).
+
+### Added
+- **Gated `invoke()`** on `StateMachine`/`Resource`/`Orchestrator` (via
+  `GatedInvokeMixin`): a single-call entry point that routes through an internal
+  Registry so the gateway establishes state that later action calls are gated
+  against. The supported replacement for reaching into a handler directly.
+- **`preserves_state=True`** on `.action()` / `@action`: the Registry ignores any
+  `_state` such an action's handler returns and keeps the current state. Use for
+  read-only / universal actions so a stray `_state` can't silently re-gate a
+  session (the failure mode behind sigma-mem's `f89aaf6` state-flip bug).
+- **`enforce_known_states=True`** (opt-in) on `Registry`/`Runner`: additionally
+  rejects a returned `_state` outside the resource's declared vocabulary
+  (`get_known_states()`), for maximum-strictness gates.
+- **`CompositeRegistry.get_current_actions()`** — previously missing, which
+  crashed the multi-resource error-recovery path with `AttributeError` on any
+  phantom/invalid tool call.
+- **`Runner(strict=True)` now halts on wrong-state known actions**, at parity
+  with phantom tools (previously only phantom tools halted under `strict`).
+- `SECURITY.md` documenting the process/credential boundary (in-process gating is
+  the agent-facing contract, not a security boundary) plus a hardened deployment
+  recipe, and `examples/hardened_deployment/`.
+- `tests/test_gating_hardening.py` — probes for every hardening item above,
+  including the phase-teleport and `get_handler`-bypass reproductions.
+
 ## [Unreleased]
 
 ### Added

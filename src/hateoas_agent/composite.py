@@ -33,14 +33,24 @@ class CompositeRegistry:
         result = composite.handle_tool_call("query_orders", {"id": "123"})
     """
 
-    def __init__(self, resources: List[Any], *, strict_transitions: bool = False):
+    def __init__(
+        self,
+        resources: List[Any],
+        *,
+        strict_transitions: bool = True,
+        enforce_known_states: bool = False,
+    ):
         self._registries: List[Registry] = []
         self._tool_map: Dict[str, Registry] = {}
         self._gateway_names: List[str] = []
         self._last_active: Optional[Registry] = None
 
         for resource in resources:
-            reg = Registry(resource, strict_transitions=strict_transitions)
+            reg = Registry(
+                resource,
+                strict_transitions=strict_transitions,
+                enforce_known_states=enforce_known_states,
+            )
             self._registries.append(reg)
 
             gw_name = reg.gateway_name
@@ -73,6 +83,19 @@ class CompositeRegistry:
         if self._last_active:
             return self._last_active._last_state
         return None
+
+    def get_current_actions(self) -> List[Any]:
+        """Return the current actions of the most recently active sub-registry.
+
+        The Runner and MCP server call this to build a recoverable error that
+        inlines the currently-valid actions after a phantom/invalid tool call.
+        Before any tool has been routed (no active sub-registry), returns an
+        empty list. Without this method the multi-resource recovery path raised
+        AttributeError and took the whole run down.
+        """
+        if self._last_active is not None:
+            return self._last_active.get_current_actions()
+        return []
 
     def get_current_tool_schemas(self) -> List[Dict[str, Any]]:
         """Merge tool schemas from all sub-registries."""
