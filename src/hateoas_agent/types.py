@@ -40,7 +40,6 @@ class GatewayDef:
     params: Dict[str, str] = field(default_factory=dict)
     required: List[str] = field(default_factory=list)
     handler: Optional[Callable] = field(default=None, repr=False)
-    preserves_state: bool = False
 
 
 @dataclass
