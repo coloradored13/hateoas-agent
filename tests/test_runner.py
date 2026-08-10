@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hateoas_agent import PhantomToolError, Runner, RunResult, StateMachine
+from hateoas_agent import InvalidActionError, PhantomToolError, Runner, RunResult, StateMachine
 
 # ---------------------------------------------------------------------------
 # Helpers to build mock Anthropic responses
@@ -247,6 +247,31 @@ class TestRunnerPhantomTool:
             runner.run("Call something fake")
 
         assert "nonexistent_tool" in str(exc_info.value)
+
+    def test_strict_mode_raises_on_wrong_state_action(self):
+        """strict=True halts on a KNOWN action called in the wrong state.
+
+        Parity with the phantom-tool case: the gateway lands in 'active', then
+        'restore_item' (valid only in 'archived') is called. Under strict the
+        wrong-state call halts instead of returning a soft, recoverable error.
+        """
+        sm = _make_machine()
+        mock_client = MagicMock()
+        mock_client.messages.create.side_effect = [
+            _mock_response(
+                [_tool_use_block("list_items", {"id": "1"}, "tu_0")],
+                stop_reason="tool_use",
+            ),
+            _mock_response(
+                [_tool_use_block("restore_item", {"id": "1"}, "tu_1")],
+                stop_reason="tool_use",
+            ),
+        ]
+
+        runner = Runner(sm, client=mock_client, strict=True)
+
+        with pytest.raises(InvalidActionError):
+            runner.run("restore item 1")
 
 
 class TestRunnerInvalidAction:
