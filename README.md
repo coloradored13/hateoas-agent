@@ -1,0 +1,383 @@
+# hateoas-agent
+
+[![CI](https://github.com/coloradored13/hateoas-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/coloradored13/hateoas-agent/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://github.com/coloradored13/hateoas-agent/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
+
+**Dynamic tool discovery for AI agents. Start with one tool. Let the API tell your agent what to do next.**
+
+Other frameworks give your LLM a flat list of tools and hope it picks the right one. With 10 tools, that works. With 50, accuracy drops. With 100+, your agent hallucinates tool names, calls things out of order, and you're left writing defensive prompts begging it to behave.
+
+hateoas-agent applies the same principle that makes the web work — [HATEOAS](https://en.wikipedia.org/wiki/HATEOAS) (Hypermedia As The Engine Of Application State). Your agent starts with a single gateway tool. Each response tells it exactly what actions are available *right now*, based on the current state. No guessing. No searching. No hallucinating.
+
+> **Other frameworks make the LLM better at choosing from too many tools. hateoas-agent makes the wrong choice impossible.**
+
+## How it compares
+
+| | Flat tools | Tool RAG | Tool Search | **hateoas-agent** |
+|---|---|---|---|---|
+| Tool selection | LLM picks from all | Semantic retrieval | LLM writes query | **Server declares what's valid** |
+| Correctness | Hope-based | Probabilistic | Probabilistic | **Deterministic** |
+| Security | Prompt-based | None | None | **Server-side enforcement** |
+| Tools visible per turn | All (100+) | ~10-20 | ~5-10 | **3-5 (only what's valid)** |
+| Model dependency | Any | Any | Provider-specific | **Any** |
+
+## Core concepts
+
+**Gateway** — The single entry-point tool that an LLM calls first. It looks up a resource and returns its current state. Every interaction starts here. Think of it like a REST API's GET endpoint — you query something, and the response tells you what you can do next.
+
+**Actions** — Operations available to the LLM, but only in certain states. An order in "pending" state might offer `approve` and `cancel`. Once approved, those disappear and `ship` appears. The LLM never sees actions that aren't valid right now.
+
+**State** — Handlers return a `_state` key that tells the framework where things stand. The framework uses this to decide which actions to advertise on the next turn. `_state` is stripped before results reach the LLM — it's internal plumbing.
+
+**Registry** — Routes incoming tool calls to the right handler, validates state before execution, filters parameters, and formats the response with the next set of available actions.
+
+## Install
+
+Not yet published to PyPI — install from GitHub:
+
+```bash
+pip install "hateoas-agent @ git+https://github.com/coloradored13/hateoas-agent@v0.3.0"            # core (zero runtime deps)
+pip install "hateoas-agent[anthropic] @ git+https://github.com/coloradored13/hateoas-agent@v0.3.0" # + Claude Runner
+pip install "hateoas-agent[mcp] @ git+https://github.com/coloradored13/hateoas-agent@v0.3.0"       # + MCP server
+```
+
+Drop the `@v0.3.0` suffix for the latest `main`.
+
+To use the `Runner`, set your API key: `export ANTHROPIC_API_KEY=sk-...`
+
+## Quick start
+
+```python
+from hateoas_agent import StateMachine, Runner
+
+# In-memory database
+db = {
+    "4521": {"id": "4521", "customer": "Jane Smith", "total": 89.99, "status": "pending"},
+    "4522": {"id": "4522", "customer": "Bob Jones", "total": 249.99, "status": "shipped"},
+}
+
+orders = StateMachine("orders", gateway_name="query_orders")
+
+# The gateway is the LLM's entry point — it queries a resource and
+# returns its current state, which determines what actions appear next.
+orders.gateway(
+    description="Search and retrieve orders",
+    params={"order_id": "string"},
+)
+
+# Actions are only visible to the LLM when the resource is in a matching state.
+# approve_order only appears when the order is "pending".
+orders.action("approve_order",
+    description="Approve this order",
+    from_states=["pending"],
+    to_state="approved",
+    params={"order_id": "string"},
+)
+
+orders.action("cancel_order",
+    description="Cancel this order",
+    from_states=["pending", "approved"],
+    to_state="cancelled",
+    params={"order_id": "string", "reason": "string"},
+)
+
+orders.action("ship_order",
+    description="Ship this order",
+    from_states=["approved"],
+    to_state="shipped",
+    params={"order_id": "string", "tracking": "string"},
+)
+
+orders.action("add_note",
+    description="Add an internal note",
+    from_states="*",  # available in every state
+    params={"order_id": "string", "note": "string"},
+)
+
+# Handlers return _state to tell the framework what state we're in now.
+# This controls which actions the LLM sees on its next turn.
+@orders.on_gateway
+def handle_query(order_id=None):
+    order = db[order_id]
+    return {"order": order, "_state": order["status"]}
+
+@orders.on_action("approve_order")
+def handle_approve(order_id):
+    db[order_id]["status"] = "approved"
+    return {"success": True, "_state": "approved"}
+
+@orders.on_action("cancel_order")
+def handle_cancel(order_id, reason=""):
+    db[order_id]["status"] = "cancelled"
+    return {"success": True, "_state": "cancelled"}
+
+@orders.on_action("ship_order")
+def handle_ship(order_id, tracking=""):
+    db[order_id]["status"] = "shipped"
+    return {"success": True, "_state": "shipped"}
+
+@orders.on_action("add_note")
+def handle_note(order_id, note=""):
+    return {"noted": True, "_state": db[order_id]["status"]}
+
+runner = Runner(orders, model="claude-opus-4-8")
+result = runner.run("Look up order 4521 and approve it.")
+```
+
+The agent can't call `ship_order` on a cancelled order — not because you told it not to, but because it **never sees the option**.
+
+## Three ways to define your state machine
+
+### Action-centric (recommended)
+
+Define actions with their transition rules. The framework builds the state graph:
+
+```python
+sm.action("approve", from_states=["pending"], to_state="approved", ...)
+sm.action("ship",    from_states=["approved"], to_state="shipped", ...)
+sm.action("cancel",  from_states=["pending", "approved"], to_state="cancelled", ...)
+sm.action("add_note", from_states="*", ...)  # available everywhere
+```
+
+### State-centric
+
+Define states with their available actions (original API, still fully supported):
+
+```python
+sm.state("pending", actions=[
+    {"name": "approve", "description": "Approve", "params": {"order_id": "string"}},
+    {"name": "cancel", "description": "Cancel", "params": {"order_id": "string"}},
+])
+sm.state("approved", actions=[
+    {"name": "ship", "description": "Ship", "params": {"order_id": "string"}},
+])
+```
+
+### Class-based (Resource API)
+
+Use decorators for an object-oriented style:
+
+```python
+class OrderResource(Resource):
+    @gateway(name="query_orders", description="Search orders", params={...})
+    def query(self, order_id=None): ...
+
+    @action(name="approve", description="Approve", params={...})
+    @state("pending")
+    def approve(self, order_id): ...
+```
+
+All three styles can be mixed and produce identical runtime behavior.
+
+## Discovery mode
+
+Don't know your state graph yet? Run wide open, observe what happens, then lock it down:
+
+```python
+# Start with no constraints
+orders = StateMachine("orders", gateway_name="query_orders", mode="discover")
+
+# Define actions without from_states — all are available everywhere
+orders.action("approve_order", description="Approve", params={"order_id": "string"})
+orders.action("ship_order", description="Ship", params={"order_id": "string"})
+orders.action("cancel_order", description="Cancel", params={"order_id": "string"})
+
+# ... define handlers that return _state as usual ...
+
+# Run your agent against real scenarios
+runner = Runner(orders, model="claude-opus-4-8")
+runner.run("Approve order 123 and ship it.")
+runner.run("Cancel order 456.")
+
+# Auto-generate the state machine from observed transitions
+report = runner.get_discovery_report()
+
+print(report.to_state_map())
+# {'approved': ['ship_order'], 'pending': ['approve_order', 'cancel_order']}
+
+print(report.to_python("orders"))
+# orders.action("approve_order",
+#     description="...",
+#     from_states=['pending'],
+#     to_state="approved",
+# )
+# ...ready-to-use .action() code
+```
+
+The progression: **discover** (zero config) → **observe** (auto-suggest constraints) → **lock down** (strict mode).
+
+## How `_state` drives everything
+
+The `_state` key in your handler's return dict is how the framework knows what state you're in. It controls which actions get advertised to the LLM on the next turn:
+
+```python
+@orders.on_action("approve_order")
+def handle_approve(order_id):
+    db[order_id]["status"] = "approved"
+    return {"success": True, "_state": "approved"}  # ← this drives the next set of actions
+```
+
+**Key rules:**
+- Every handler should return a dict with `_state` set to the current state name
+- `_state` is stripped before results reach the LLM — it's internal plumbing, not user-visible data
+- If a handler returns a dict without `_state`, the state stays unchanged and a warning is logged
+- `_state` must be a string — non-string values raise `TypeError`
+
+If you're using the action-centric API with `to_state` metadata, the framework will also warn if your handler returns a `_state` that doesn't match the declared `to_state` — useful for catching bugs early.
+
+## Security
+
+The framework uses server-side state validation — not prompts — to enforce correctness. Every action is checked against the current state before execution.
+
+**Defense layers:**
+
+- **Server-side state validation** — actions called in the wrong state or before any gateway call are rejected.
+- **Phantom tool detection** — if the agent fabricates a tool name, it's caught and rejected.
+- **Defensive system prompt** — instructs the LLM to only use actions from the most recent tool result.
+- **Parameter filtering** — handlers only receive declared parameters. Extra keys are stripped. Required parameters are validated before handler execution; missing required params return an error without calling the handler.
+- **State type validation** — `_state` must be a string. Non-string values raise `TypeError`.
+- **Transition enforcement (opt-in)** — pass `strict_transitions=True` to `Runner` or `Registry` to enforce declared `to_state` values: a handler that returns a `_state` other than its action's declared `to_state` raises `StateTransitionError` and the mismatched state is not committed. By default the mismatch is logged as a warning and applied (back-compatible).
+
+> **Threat model.** The model across the API can only emit tool calls — it cannot set the resource's state directly, and it cannot smuggle a `_state` into tool input (undeclared keys are filtered before any handler runs). State only changes through your handlers' return values, which are trusted server-side code. The one way the model gains state control is if a handler pipes an LLM-supplied parameter straight into `_state` (e.g. `return {"_state": params["target"]}`) — **never do that**. See `tests/test_state_integrity.py` for the probes that pin these properties.
+
+**Callbacks and strict mode:**
+
+```python
+runner = Runner(
+    orders,
+    on_phantom_tool=lambda name, inp, state: log.warning(f"Phantom: {name}"),
+    on_invalid_action=lambda name, inp, state: log.info(f"Invalid: {name} in {state}"),
+    on_transition=lambda old, action, new: log.info(f"{old} -> {new}"),
+    strict=True,  # raise PhantomToolError instead of returning error to LLM
+)
+```
+
+- `on_phantom_tool` — agent called a tool that doesn't exist in any state (hallucination or injection).
+- `on_invalid_action` — agent called a real action that isn't valid for the current state.
+- `on_transition` — fires on every state change for logging/auditing.
+
+**MCP server security model:**
+
+The MCP server (`hateoas_agent.mcp_server.serve()`) uses stdio transport and trusts all connected clients. State validation and parameter filtering apply to MCP tool calls the same way they do to Runner calls, but there is no authentication or authorization layer. Do not expose the MCP server to untrusted clients.
+
+## When to use it
+
+- You have a domain with **stateful workflows** (orders, tickets, deployments, approvals)
+- Your tool count is **growing beyond what an LLM can reliably choose from**
+- You need **server-side guarantees** that the agent can't take invalid actions
+- You want to **prototype fast** (discovery mode) and **lock down later** (strict mode)
+
+## Orchestration (v0.2)
+
+The core `StateMachine` manages tool discovery for a single LLM conversation. The `Orchestrator` extends the same pattern to multi-agent workflows — where multiple LLM agents need to coordinate through a series of phases (research, challenge, synthesis, etc.) with rules governing when to move between them.
+
+The orchestrator models workflow phases as HATEOAS states. Each phase defines which agents participate and whether they run in parallel. Transitions between phases are guarded by conditions — callable checks against a shared context dict. Agents are managed as `AgentSlot` dataclasses: lightweight containers holding name, role, status, and output.
+
+```python
+from hateoas_agent import Orchestrator, AgentSlot, AsyncRunner, all_converged, exit_gate_passed
+
+review = Orchestrator(
+    name="code-review",
+    agents=[
+        AgentSlot("reviewer", role="Code review"),
+        AgentSlot("security", role="Security audit"),
+        AgentSlot("challenger", role="Adversarial review", join_phase="challenge"),
+    ],
+)
+
+review.phase("research", parallel=True, agents="*")
+review.phase("challenge", parallel=True, agents="*")
+review.phase("synthesis", parallel=False, agents=["reviewer"], terminal=True)
+
+review.transition("research", "challenge",
+    guard=all_converged())
+review.transition("challenge", "synthesis",
+    guard=exit_gate_passed())
+review.transition("challenge", "challenge")  # self-loop for additional rounds
+
+@review.on_phase("research")
+def run_research(orchestrator, agents, context):
+    for agent in agents:
+        orchestrator.run_agent(agent, task=context["task"])
+    return {"round": 1}
+
+state = review.start("research", context={"task": "review auth module"})
+state = review.advance(context={"converged": True})
+```
+
+Because `Orchestrator` implements the same `HasHateoas` protocol as `StateMachine`, it works with `Registry` (tool routing), MCP server, persistence, and visualization with no additional integration code.
+
+For a real-world example, [sigma-mem](https://github.com/coloradored13/sigma-mem) uses hateoas-agent's state machine and MCP integration to build a persistent memory system for AI agent teams.
+
+**Guard conditions** — composable factories in `conditions.py`:
+
+```python
+from hateoas_agent import all_converged, belief_above, round_limit
+
+# Compose with & | ~
+guard = all_converged() & belief_above("confidence", 0.85)
+guard = round_limit(5) | exit_gate_passed()
+```
+
+**Additional features:**
+- `AsyncRunner` — drives an orchestrator to completion with async handler support
+- `orchestrator_to_mermaid()` — generates Mermaid diagrams with guard labels and agent annotations
+- `save_orchestrator_checkpoint()` / `load_orchestrator_checkpoint()` — persist and restore orchestrator state
+- `AgentSlot.join_phase` — agents can join the workflow at a specific phase rather than from the start
+- `run_agent()` and `run_agents_parallel()` — sequential and parallel agent execution with pluggable executors
+
+## MCP server integration
+
+[MCP (Model Context Protocol)](https://modelcontextprotocol.io) is an open standard for connecting LLMs to external tools. Instead of embedding tool logic inside your LLM application, you run a separate MCP server that exposes tools over a transport layer (typically stdio). The LLM client discovers available tools at runtime and calls them through the protocol.
+
+hateoas-agent can expose any state machine as an MCP server with one call:
+
+```python
+from hateoas_agent.mcp_server import serve
+
+serve(my_state_machine, name="my-server")
+```
+
+This starts a stdio-based MCP server where:
+- The gateway and current-state actions are listed as MCP tools
+- After each tool call that changes state, the server sends a `tools/list_changed` notification so the client refreshes its tool list
+- State validation, parameter filtering, and all other security layers apply identically to MCP calls
+
+To connect from Claude Code:
+
+```bash
+claude mcp add my-server -- python /absolute/path/to/my_mcp_server.py
+```
+
+See `examples/orders_mcp.py` for a complete working example.
+
+## Additional features
+
+Beyond the core state machine and orchestrator:
+
+- **Visualization** — `state_machine_to_mermaid()` and `discovery_report_to_mermaid()` generate Mermaid diagrams from any state machine or discovery session
+- **Persistence** — `save_runner_checkpoint()` / `load_runner_checkpoint()` serialize full runner state (conversation history, current state, tool definitions) to JSON for pause/resume
+- **Composite registries** — `CompositeRegistry` merges multiple state machines into a single tool namespace with conflict detection
+- **Validation** — `validate_action()` checks action definitions for common mistakes before runtime
+
+## Examples
+
+See `examples/` for complete working examples:
+
+- `orders_action_centric.py` — action-centric API with transition rules
+- `orders_declarative.py` — state-centric API (original style)
+- `orders_resource.py` — class-based Resource API
+- `orders_with_guards.py` — conditional actions with guard functions
+- `orders_discovery.py` — discovery mode with auto-generated state machine
+- `orders_visualization.py` — Mermaid diagram generation
+- `orders_persistence.py` — checkpoint and restore state
+- `orders_mcp.py` — MCP server integration
+- `multi_resource.py` — composing multiple resources
+- `comparison_flat_vs_hateoas.py` — flat tools vs HATEOAS side-by-side
+- `database_admin.py` — SQLite admin tool with state-driven navigation
+- `database_admin_api.py` — database admin with action-centric API
+
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE) for details.
